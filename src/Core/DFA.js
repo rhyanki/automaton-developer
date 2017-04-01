@@ -257,11 +257,14 @@ class DFA {
 	}
 
 	/**
-	 * Return a map of transitions from a state.
-	 * @param {Number} origin The origin state ID.
-	 * @returns {Map} A map from target : Number to symbols : SymbolGroup.
+	 * Return a map of transitions from a state, or all transitions.
+	 * @param {Number} [origin] The origin state ID.
+	 * @returns {Map} A map from target : Number to symbols : SymbolGroup, or from origin to such a map.
 	 */
 	transitions(origin) {
+		if (origin === undefined) {
+			return this._transitions;
+		}
 		origin = this.state(origin);
 		if (!origin) {
 			return;
@@ -477,6 +480,13 @@ class DFA {
 			freeze(dfa);
 		}
 		return dfa;
+	}
+
+	/**
+	 * Toggle whether a state is an accept state or not.
+	 */
+	toggleAccept(state) {
+		return this.setAccept(state, !this.accept(state));
 	}
 }
 

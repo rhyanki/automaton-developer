@@ -11,7 +11,7 @@ class DFAEditor extends Component {
 		}
 
 		this.handle = this.handle.bind(this);
-		this.handleUpdateAccept = this.handleUpdateAccept.bind(this);
+		this.handleToggleAccept = this.handleToggleAccept.bind(this);
 		this.handleUpdateStart = this.handleUpdateStart.bind(this);
 		this.handleUpdateStateName = this.handleUpdateStateName.bind(this);
 		this.handleUpdateTransitionTarget = this.handleUpdateTransitionTarget.bind(this);
@@ -30,8 +30,8 @@ class DFAEditor extends Component {
 		};
 	}
 
-	handleUpdateAccept(state, accept) {
-		this.setState(this.handle('setAccept', state, accept));
+	handleToggleAccept(state, accept) {
+		this.setState(this.handle('toggleAccept', state));
 	}
 
 	handleUpdateStart(state) {
@@ -39,7 +39,7 @@ class DFAEditor extends Component {
 	}
 
 	handleUpdateStateName(state, name) {
-		this.setState(this.handle('setStateName', state, name));
+		this.setState(this.handle('setName', state, name));
 	}
 
 	handleUpdateTransitionTarget(origin, oldTarget, newTarget) {
@@ -61,7 +61,7 @@ class DFAEditor extends Component {
 			}
 			try {
 				return {
-					dfa: prevState.dfa.updateTransitionSymbols(origin, target, symbols)
+					dfa: prevState.dfa.setTransitionSymbols(origin, target, symbols)
 				};
 			} catch (e) {
 				window.alert(e.message);
@@ -74,7 +74,7 @@ class DFAEditor extends Component {
 		return (<div className="row">
 			<div className="col-md-6">
 				<StateList dfa={this.state.dfa}
-				handleUpdateAccept={this.handleUpdateAccept}
+				handleToggleAccept={this.handleToggleAccept}
 				handleUpdateStart={this.handleUpdateStart}
 				handleUpdateStateName={this.handleUpdateStateName}
 				handleUpdateTransitionTarget={this.handleUpdateTransitionTarget}
@@ -83,8 +83,9 @@ class DFAEditor extends Component {
 			</div>
 			<div className="col-md-6">
 				<VisualEditor dfa={this.state.dfa}
-				handleUpdateAccept={this.handleUpdateAccept}
+				handleToggleAccept={this.handleToggleAccept}
 				handleUpdateStateName={this.handleUpdateStateName}
+				promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 				/>
 			</div>
 		</div>);

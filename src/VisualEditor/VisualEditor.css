@@ -12,13 +12,76 @@
 }
 
 .VisualEditor .state {
-	border-style: solid;
-	border-width: 1px;
-	padding: 10px 10px 10px 10px;
-	position: absolute;
-	/*transform: translate(-50%, -50%);*/
+	cursor: move;
+	user-drag: none;
+	user-select: none;
+	-moz-user-select: none;
+	-webkit-user-drag: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
 }
 
-.VisualEditor .state input[type=text] {
-	width: 70%;
+.VisualEditor .state text {
+	fill: black;
+	font-size: 10pt;
+}
+
+.VisualEditor .state rect {
+	fill: #eee;
+}
+
+.VisualEditor .state-accept rect {
+	fill: #9f9;
+}
+
+.VisualEditor .state-nongenerating rect {
+	fill: #f99;
+}
+
+.VisualEditor .state-unreachable rect {
+	fill: #ff9;
+}
+
+.VisualEditor .state .btn-edit-state {
+	display: none;
+}
+
+.VisualEditor .state:hover .btn-edit-state {
+	display: inline;
+}
+
+.VisualEditor .btn-edit-state:hover {
+	background-color: aquamarine;
+	cursor: pointer;
+}
+
+.VisualEditor .transition .symbol {
+	fill: black;
+	font-size: 10pt;
+	font-weight: bold;
+}
+
+.VisualEditor .transition .symbol:hover {
+	fill: aquamarine;
+	cursor: pointer;
+}
+
+.VisualEditor .transition .arrow .shaft {
+	fill: none;
+	stroke: red;
+	stroke-width: 3;
+}
+
+.VisualEditor .transition .arrow .head {
+	fill: black;
+	stroke: black;
+	stroke-width: 3;
+}
+
+.VisualEditor .transition .arrow:hover {
+	cursor: pointer;
+}
+
+.VisualEditor .transition .arrow:hover .shaft {
+	stroke: aquamarine;
 }
