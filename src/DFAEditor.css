@@ -1,0 +1,19 @@
+.state {
+	background-color: #eee;
+}
+
+.state-accept {
+	background-color: #9f9;
+}
+
+.state-nongenerating {
+	background-color: #f99;
+}
+
+.state-unreachable {
+	background-color: #ff9;
+}
+
+.click-editable:hover {
+	background-color: aquamarine;
+}
