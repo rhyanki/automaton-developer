@@ -2,9 +2,20 @@ import React, { Component } from 'react';
 import './VisualEditor.css';
 
 class Vector {
-	constructor(x, y) {
-		this.x = x;
-		this.y = y;
+	/**
+	 * 
+	 * @param {Number} x The x-coordinate, or radius if using polar.
+	 * @param {Number} y The y-coordinate, or angle if using polar.
+	 * @param {Boolean} [polar = false] Whether to use polar coordinates (default Euclidean).
+	 */
+	constructor(xOrRadius, yOrAngle, polar) {
+		if (polar === undefined || !polar) {
+			this.x = xOrRadius;
+			this.y = yOrAngle;
+		} else {
+			this.x = xOrRadius * Math.cos(yOrAngle);
+			this.y = xOrRadius * Math.sin(yOrAngle);
+		}
 		Object.freeze(this);
 	}
 
@@ -148,6 +159,19 @@ class VisualEditor extends Component {
 		);
 	}
 
+	normalizeAngle(angle) {
+		if (angle > Math.PI) {
+			while (angle > Math.PI) {
+				angle -= Math.PI * 2;
+			}
+			return angle;
+		}
+		while (angle <= -Math.PI) {
+			angle += Math.PI * 2;
+		}
+		return angle;
+	}
+
 	// Return a position on a quadratic curve at a given t value
 	quadraticCurveAt(start, control, end, t) {
 		// This is just the quadratic Bezier formula
@@ -217,68 +241,175 @@ class VisualEditor extends Component {
 	}
 
 	/**
-	 * Return an SVG group for a transition.
+	 * Return an array of SVG groups for all transitions from a state.
 	 */
-	renderTransition(origin, target, symbols) {
-		if (origin === target) {
-			// Will need to make special case for self-connections
-			return null;
+	renderTransitions() {
+		const dfa = this.props.dfa;
+		const output = [];
+		const angles = new Map(); // List of angles around the state's circle at which each transition arrow leaves
+
+		const ARROW_HEAD_SIZE = 10;
+		const ARROW_HEAD_ANGLE = Math.PI / 3;
+
+		for (const state of this.state.positions.keys()) {
+			angles.set(state, []);
+		};
+
+		for (const [origin, originPos] of this.state.positions) {
+			for (const [target, symbols] of dfa.transitions(origin)) {
+				if (origin === target) {
+					// Will need to make special case for self-connections
+					continue;
+				}
+
+				const targetPos = this.pos(target);
+
+				// Don't bother rendering if the states are overlapping
+				const dist = originPos.distanceTo(targetPos);
+				if (dist < this.STATE_RADIUS) {
+					continue;
+				}
+
+				let d = "M" + originPos.x + " " + originPos.y;
+
+				let control;
+				let symbolsPos;
+
+				// If there is a two-way connection, draw curved lines
+				if (dfa.transition(target, origin)) {
+					control = this.controlPoint(originPos, targetPos, 30);
+					d += " Q " + control.x + " " + control.y + ", " + targetPos.x + " " + targetPos.y;
+					symbolsPos = this.controlPoint(originPos, targetPos, 25);
+				} else {
+					d += " L " + targetPos.x + " " + targetPos.y;
+					control = originPos.midpoint(targetPos);
+					symbolsPos = this.controlPoint(originPos, targetPos, 10);
+				}
+
+				const angle = originPos.angleTo(targetPos);
+
+				const targetIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, 1 - this.STATE_RADIUS / dist);
+				const arrowHead = this.renderArrowHead(targetIntersectPos, angle, ARROW_HEAD_SIZE, ARROW_HEAD_ANGLE);
+
+				if (dfa.transition(target, target)) {
+					angles.get(target).push(targetPos.angleTo(targetIntersectPos));
+				}
+
+				// Push the angle around the state circle from which the transition arrow protrudes
+				const originIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, this.STATE_RADIUS / dist);
+				if (dfa.transition(origin, origin)) {
+					angles.get(origin).push(originPos.angleTo(originIntersectPos));
+				}
+
+				let textAnchor;
+				if (this.normalizeAngle(angle) > 0) {
+					textAnchor = "start";
+				} else {
+					textAnchor = "end";
+				}
+
+				output.push(<g
+					key={[origin, target]}
+					className="transition"
+				>
+					<g className="arrow">
+						<path className="shaft" d={d} />;
+						{arrowHead}
+					</g>
+					<text
+						className="symbol"
+						x={symbolsPos.x}
+						y={symbolsPos.y + 5}
+						textAnchor={textAnchor}
+						onClick={() => this.props.promptUpdateTransitionSymbols(origin, target)}
+					>{symbols.toString()}</text>
+				</g>);
+			}
 		}
-		const start = this.pos(origin);
-		const end = this.pos(target);
-		let d = "M" + start.x + " " + start.y;
 
-		let control;
-		let symbolsPos;
+		for (const state of this.state.positions.keys()) {
+			if (dfa.transition(state, state)) {
+				const pos = this.pos(state);
+				let angs = angles.get(state);
 
-		// If there is a two-way connection, draw curved lines
-		if (this.props.dfa.transition(target, origin)) {
-			control = this.controlPoint(start, end, 30);
-			d += " Q " + control.x + " " + control.y + ", " + end.x + " " + end.y;
-			symbolsPos = this.controlPoint(start, end, 25);
-		} else {
-			d += " L " + end.x + " " + end.y;
-			control = start.midpoint(end);
-			symbolsPos = this.controlPoint(start, end, 10);
+				let angle;
+
+				if (angs.length === 0) {
+					angle = - Math.PI / 2;
+				} else if (angs.length === 1) {
+					// If there is just one arrow, put the self-arrow on the opposite side
+					angle = angs[0] + Math.PI;
+				} else {
+					// Otherwise, we want to put the transition wherever there is the largest gap between two other arrows.
+					angs.sort((a, b) => a - b);
+					// The loop will get every angle difference except from the last to the first
+					let max = Math.PI * 2 + angs[0] - angs[angs.length - 1];
+					angle = (Math.PI * 2 + angs[0] + angs[angs.length - 1]) / 2;
+					for (let i = 0; i < angs.length - 1; i++) {
+						const diff = angs[i + 1] - angs[i];
+						if (diff > max) {
+							max = diff;
+							angle = (angs[i + 1] + angs[i]) / 2;
+						}
+					}
+				}
+
+				const r = this.STATE_RADIUS * 0.4; // The radius of the arc to draw
+				const theta = Math.PI / 6; // The desired angle between the two intersection points of the arc with the state circle
+				const aStart = angle - theta / 2;
+				const aEnd = angle + theta / 2;
+				const start = pos.plus(new Vector(this.STATE_RADIUS, aStart, true));
+				const end = pos.plus(new Vector(this.STATE_RADIUS, aEnd, true));
+
+				let d = "M" + start.x + " " + start.y + " A " + r + " " + r + " 0 1 1 " + end.x + " " + end.y;
+				const symbols = dfa.symbols(state, state);
+				const symbolsPos = pos.plus(new Vector(this.STATE_RADIUS + r * 2.1, angle, true));
+
+				let textAnchor;
+				if (Math.abs(this.normalizeAngle(angle)) > Math.PI / 2) {
+					textAnchor = "end";
+				} else {
+					textAnchor = "start";
+				}
+
+				// Calculate the angle of the arrowhead ...
+				// Basically, we know the two arc points, and the radius.
+				// Draw a triangle between the two arc points and the arc center, and call the two equal angles theta.
+				// Then theta we can see is perpendicular to the gradient of the arc at the end point (assuming the triangle is directly above the main circle)
+				// Then just add the angle from the main circle center to the arc center.
+				// Let d = d between arc points, then
+				// 2 r cos θ = d
+				// So θ = acos(d / 2r)
+				// Then arrowAngle = -π/2 - θ + angle = -π/2 - acos(d / 2r) + angle.
+				const dist = start.distanceTo(end);
+				const arrowAngle = -Math.PI / 2 - Math.acos(dist / (2 * r)) + angle;
+
+				const arrowHead = this.renderArrowHead(end, arrowAngle, ARROW_HEAD_SIZE, ARROW_HEAD_ANGLE);
+
+				output.push(<g
+					key={[state, state]}
+					className="transition"
+				>
+					<g className="arrow">
+						<path className="shaft" d={d} />
+						{arrowHead}
+					</g>
+					<text
+						className="symbol"
+						x={symbolsPos.x}
+						y={symbolsPos.y + 5}
+						textAnchor={textAnchor}
+						onClick={() => this.props.promptUpdateTransitionSymbols(state, state)}
+					>{symbols.toString()}</text>
+				</g>);
+			}
 		}
 
-		const angle = start.angleTo(end);
-
-		// Also render the arrow head, unless the states are overlapping (otherwise funny things happen)
-		let arrowHead = null;
-		if (start.distanceTo(end) > this.STATE_RADIUS) {
-			const arrowHeadPos = this.quadraticCurveAt(start, control, end, 1 - this.STATE_RADIUS / start.distanceTo(end));
-			arrowHead = this.renderArrowHead(arrowHeadPos, angle, 10, Math.PI / 3);
-		}
-
-		let textAnchor;
-		if (angle > 0) {
-			textAnchor = "start";
-		} else {
-			textAnchor = "end";
-		}
-
-		return (<g
-			key={[origin, target]}
-			className="transition"
-		>
-			<g className="arrow">
-				<path className="shaft" d={d} />;
-				{arrowHead}
-			</g>
-			<text
-				className="symbol"
-				x={symbolsPos.x}
-				y={symbolsPos.y + 5}
-				textAnchor={textAnchor}
-				onClick={() => this.props.promptUpdateTransitionSymbols(origin, target)}
-			>{symbols.toString()}</text>
-		</g>)
+		return output;
 	}
 
 	render() {
 		const states = [];
-		const transitions = [];
 		const dfa = this.props.dfa;
 		for (const [state, pos] of this.state.positions) {
 			states.push(<g
@@ -316,11 +447,6 @@ class VisualEditor extends Component {
 					textAnchor="middle"
 				>{dfa.name(state)}</text>
 			</g>);
-			
-			// Render the transitions too
-			for (const [target, symbols] of dfa.transitions(state)) {
-				transitions.push(this.renderTransition(state, target, symbols));
-			}
 		}
 
 		return (
@@ -333,7 +459,7 @@ class VisualEditor extends Component {
 				onMouseLeave={() => {this.stopDragging()}}
 				onMouseUp={() => {this.stopDragging()}}
 			>
-				{transitions}
+				{this.renderTransitions()}
 				{states}
 			</svg>
 		);

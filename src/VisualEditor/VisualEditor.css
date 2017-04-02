@@ -57,7 +57,7 @@
 
 .VisualEditor .transition .symbol {
 	fill: black;
-	font-size: 10pt;
+	font-size: 12px;
 	font-weight: bold;
 }
 
@@ -73,7 +73,7 @@
 }
 
 .VisualEditor .transition .arrow .head {
-	fill: black;
+	fill: none;
 	stroke: black;
 	stroke-width: 3;
 }
