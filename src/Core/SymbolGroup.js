@@ -6,11 +6,8 @@
  */
 class SymbolGroup {
 
-	_asciiRegex = /^[\x00-\x7F]*$/;
+	_allowedCharsRegex = /^[\x00-\x7Fε␣]*$/;
 	_backslashSymbols = new Map([
-		["~", "~"],
-		["\\", "\\"],
-		["-", "-"],
 		["n", "\n"],
 		["r", "\r"],
 		["t", "\t"],
@@ -19,8 +16,8 @@ class SymbolGroup {
 	]);
 	_toBackslash = new Map([
 		["~", "~"],
+		[",", ","],
 		["\\", "\\"],
-		["-", "-"],
 		["\n", "n"],
 		["\r", "r"],
 		["\t", "t"],
@@ -28,81 +25,102 @@ class SymbolGroup {
 		["\v", "v"],
 	]);
 
+	/**
+	 * Parse a raw input symbol (in the form of a backslash sequence, ~, or a normal character).
+	 * @param {String} input
+	 */
+	_parseSymbol(input) {
+		if (input[0] === "\\") {
+			const afterBackslash = input.substr(1);
+			const backslashSymbol = this._backslashSymbols.get(afterBackslash);
+			if (backslashSymbol) {
+				return backslashSymbol;
+			} else {
+				return afterBackslash;
+			}
+		}
+		if (input === "ε" || input === "~") {
+			return "";
+		}
+		if (input === "␣") {
+			return " ";
+		}
+		return input;
+	}
+
+	/**
+	 * @param {String} input The input string, containing any ASCII characters or ε. Backslash codes (such as \n) and ranges (such as a-z) are allowed. ~ is an alias for ε (no symbol). All whitespace is stripped unless following a backslash.
+	 */
 	constructor(input) {
 		this._symbols = new Set();
 
-		if (!this._asciiRegex.test(input)) {
+		if (!this._allowedCharsRegex.test(input)) {
 			throw new Error("Only ASCII characters are allowed for now.");
 		}
 
-		// Special case: empty input is allowed, and interpreted as ε
-		if (input === "") {
+		// Special case: empty input or a single character are interpreted literally
+		if (input === "" || input === "~" || input === "ε") {
 			this._symbols.add("");
+			input = "";
+		} else if (input.length === 1) {
+			this._symbols.add(input[0]);
+			input = "";
 		}
 
-		// Parse the input
-		let backslash = false; // Backslash was just read
-		let hyphen = false; // Hyphen was just read
-		let lastSymbol = null; // Last full symbol read
+		// Remove all whitespace not following a backslash
+		input = input.replace(/([^\\])\s/g, "$1");
 
-		for (let i = 0; i < input.length; i++) {
-			let c = input[i];
-			let symbol = null;
-			if (backslash) {
-				if (this._backslashSymbols.has(c)) {
-					symbol = this._backslashSymbols.get(c);
-				} else {
-					symbol = c;
-				}
-				backslash = false;
-			}
-			if (hyphen) {
-				if (lastSymbol) {
-					for (let p = lastSymbol.codePointAt(0); p < c.codePointAt(0); p++) {
-						this._symbols.add(String.fromCodePoint(p));
-					}
-				}
-				lastSymbol = null;
-				hyphen = false;
-			}
-			if (backslash || hyphen) {
+		while (input.length > 0) {
+			let matches;
+
+			// Try to match a comma
+			if (input[0] === ',') {
+				input = input.substr(1);
 				continue;
 			}
-			if (!symbol) {
-				if (c === '~') {
-					this._symbols.add('');
-				} else if (c === '-') {
-					hyphen = true;
-				} else if (c === '\\') {
-					backslash = true;
-				} else {
-					symbol = c;
+
+			// Try to match a character range
+			matches = input.match(/^(\\?[^,])-(\\?[^,])/);
+			if (matches) {
+				const rangeStart = this._parseSymbol(matches[1]);
+				const rangeEnd = this._parseSymbol(matches[2]);
+				for (let p = rangeStart.codePointAt(0); p <= rangeEnd.codePointAt(0); p++) {
+					this._symbols.add(String.fromCodePoint(p));
 				}
+				input = input.substr(matches[0].length);
+				continue;
 			}
-			if (symbol) {
-				this._symbols.add(symbol);
-				lastSymbol = symbol;
+
+			// Try to match a character
+			matches = input.match(/^\\?./);
+			if (matches) {
+				this._symbols.add(this._parseSymbol(matches[0]));
+				input = input.substr(matches[0].length);
+				continue;
 			}
 		}
 
 		// Now create the normalized string
-		let symbolsList = Array.from(this._symbols.keys());
+		const symbolsList = Array.from(this._symbols.keys());
 		symbolsList.sort();
 
 		for (let i = 0; i < symbolsList.length; i++) {
-			if (this._toBackslash.has(symbolsList[i])) {
-				symbolsList[i] = "\\" + this._toBackslash.get(symbolsList[i]);
-			} else if (symbolsList[i] === "") {
-				symbolsList[i] = "~";
+			const symbol = symbolsList[i];
+			if (this._toBackslash.has(symbol)) {
+				symbolsList[i] = "\\" + this._toBackslash.get(symbol);
+			} else if (symbol === "") {
+				symbolsList[i] = "ε";
+			} else if (symbol === " ") {
+				symbolsList[i] = "␣";
 			}
 		}
 
-		this._normalized = symbolsList.join("");
+		this._normalized = symbolsList.join(", ");
 	}
 
 	/**
 	 * Return whether this symbol group is equivalent to another symbol group (i.e. they match the same symbols).
-	 * @param {String} symbolGroup The symbol group.
+	 * @param {SymbolGroup} symbolGroup The symbol group.
 	 */
 	equals(symbolGroup) {
 		return this._normalized === symbolGroup._normalized;

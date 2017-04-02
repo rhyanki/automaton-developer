@@ -55,20 +55,9 @@
 	cursor: pointer;
 }
 
-.VisualEditor .transition .symbol {
-	fill: black;
-	font-size: 12px;
-	font-weight: bold;
-}
-
-.VisualEditor .transition .symbol:hover {
-	fill: aquamarine;
-	cursor: pointer;
-}
-
 .VisualEditor .transition .arrow .shaft {
 	fill: none;
-	stroke: red;
+	stroke: blue;
 	stroke-width: 3;
 }
 
@@ -83,5 +72,16 @@
 }
 
 .VisualEditor .transition .arrow:hover .shaft {
-	stroke: aquamarine;
+	stroke: red;
+}
+
+.VisualEditor .transition .symbol {
+	fill: black;
+	font-size: 12px;
+	font-weight: bold;
+}
+
+.VisualEditor .transition .symbol:hover {
+	fill: aquamarine;
+	cursor: pointer;
 }

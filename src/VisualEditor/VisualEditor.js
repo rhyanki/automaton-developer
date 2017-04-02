@@ -1,98 +1,6 @@
 import React, { Component } from 'react';
+import Vector from './Vector.js';
 import './VisualEditor.css';
-
-class Vector {
-	/**
-	 * 
-	 * @param {Number} x The x-coordinate, or radius if using polar.
-	 * @param {Number} y The y-coordinate, or angle if using polar.
-	 * @param {Boolean} [polar = false] Whether to use polar coordinates (default Euclidean).
-	 */
-	constructor(xOrRadius, yOrAngle, polar) {
-		if (polar === undefined || !polar) {
-			this.x = xOrRadius;
-			this.y = yOrAngle;
-		} else {
-			this.x = xOrRadius * Math.cos(yOrAngle);
-			this.y = xOrRadius * Math.sin(yOrAngle);
-		}
-		Object.freeze(this);
-	}
-
-	/**
-	 * Return the direction/angle of the vector from (0, 0).
-	 */
-	angle() {
-		return Math.atan2(this.y, this.x);
-	}
-
-	/**
-	 * Return the angle to another vector.
-	 */
-	angleTo(v) {
-		return v.minus(this).angle();
-	}
-
-	/**
-	 * Multiply the vector by a scalar.
-	 * @param {Number} s The scalar.
-	 */
-	by(s) {
-		return new Vector(this.x * s, this.y * s);
-	}
-
-	/**
-	 * Return the distance to another vector.
-	 * @param {Vector} v The other vector.
-	 */
-	distanceTo(v) {
-		return this.minus(v).length();
-	}
-
-	/**
-	 * Return the length/magnitude of the vector.
-	 */
-	length() {
-		return Math.sqrt(this.x * this.x + this.y * this.y);
-	}
-
-	/**
-	 * Return the midpoint between this vector and another.
-	 * @param {Vector} v The vector to subtract.
-	 */
-	midpoint(v) {
-		return new Vector((this.x + v.x) / 2, (this.y + v.y) / 2)
-	}
-
-	/**
-	 * Subtract another vector from the vector.
-	 * @param {Vector} v The vector to subtract.
-	 */
-	minus(v) {
-		return new Vector(this.x - v.x, this.y - v.y);
-	}
-
-	/**
-	 * Add the vector to another vector.
-	 * @param {Vector} v The vector to add.
-	 */
-	plus(v) {
-		return new Vector(this.x + v.x, this.y + v.y);
-	}
-
-	plusX(x) {
-		return new Vector(this.x + x, this.y);
-	}
-
-	plusY(y) {
-		return new Vector(this.x, this.y + y);
-	}
-
-	*[Symbol.iterator]() {
-		yield this.x;
-		yield this.y;
-	}
-}
 
 class VisualEditor extends Component {
 	constructor(props) {
@@ -172,15 +80,6 @@ class VisualEditor extends Component {
 		return angle;
 	}
 
-	// Return a position on a quadratic curve at a given t value
-	quadraticCurveAt(start, control, end, t) {
-		// This is just the quadratic Bezier formula
-		let ret = start.by(Math.pow(1 - t, 2));
-		ret = ret.plus(control.by(2 * (1 - t) * t));
-		ret = ret.plus(end.by(t * t));
-		return ret;
-	}
-
 	promptEditState(state) {
 		if (this.state.dragging) {
 			return;
@@ -189,6 +88,15 @@ class VisualEditor extends Component {
 		if (newName) {
 			this.props.handleUpdateStateName(state, newName);
 		}
+	}
+
+	// Return a position on a quadratic curve at a given t value
+	quadraticCurveAt(start, control, end, t) {
+		// This is just the quadratic Bezier formula
+		let ret = start.by(Math.pow(1 - t, 2));
+		ret = ret.plus(control.by(2 * (1 - t) * t));
+		ret = ret.plus(end.by(t * t));
+		return ret;
 	}
 
 	resetPositions() {
@@ -276,7 +184,7 @@ class VisualEditor extends Component {
 				let symbolsPos;
 
 				// If there is a two-way connection, draw curved lines
-				if (dfa.transition(target, origin)) {
+				if (dfa.hasTransition(target, origin)) {
 					control = this.controlPoint(originPos, targetPos, 30);
 					d += " Q " + control.x + " " + control.y + ", " + targetPos.x + " " + targetPos.y;
 					symbolsPos = this.controlPoint(originPos, targetPos, 25);
@@ -291,13 +199,13 @@ class VisualEditor extends Component {
 				const targetIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, 1 - this.STATE_RADIUS / dist);
 				const arrowHead = this.renderArrowHead(targetIntersectPos, angle, ARROW_HEAD_SIZE, ARROW_HEAD_ANGLE);
 
-				if (dfa.transition(target, target)) {
+				if (dfa.hasTransition(target, target)) {
 					angles.get(target).push(targetPos.angleTo(targetIntersectPos));
 				}
 
 				// Push the angle around the state circle from which the transition arrow protrudes
 				const originIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, this.STATE_RADIUS / dist);
-				if (dfa.transition(origin, origin)) {
+				if (dfa.hasTransition(origin, origin)) {
 					angles.get(origin).push(originPos.angleTo(originIntersectPos));
 				}
 
@@ -313,7 +221,7 @@ class VisualEditor extends Component {
 					className="transition"
 				>
 					<g className="arrow">
-						<path className="shaft" d={d} />;
+						<path className="shaft" d={d} onClick={() => this.props.promptDeleteTransition(origin, target)} />
 						{arrowHead}
 					</g>
 					<text
@@ -328,7 +236,7 @@ class VisualEditor extends Component {
 		}
 
 		for (const state of this.state.positions.keys()) {
-			if (dfa.transition(state, state)) {
+			if (dfa.hasTransition(state, state)) {
 				const pos = this.pos(state);
 				let angs = angles.get(state);
 
@@ -391,7 +299,7 @@ class VisualEditor extends Component {
 					className="transition"
 				>
 					<g className="arrow">
-						<path className="shaft" d={d} />
+						<path className="shaft" d={d} onClick={() => this.props.promptDeleteTransition(state, state)} />
 						{arrowHead}
 					</g>
 					<text

@@ -62,7 +62,7 @@ class DFA {
 		// Parse input states
 		if (template.states instanceof Array) {
 			for (let i = 0; i < template.states.length; i++) {
-				let state = this._shared.nextID;
+				const state = this._shared.nextID;
 				this._states.set(state, template.states[i].name);
 				if (template.states[i].accept) {
 					this._accept.add(state);
@@ -123,26 +123,43 @@ class DFA {
 	}
 
 	/**
-	 * Return the accept states, or whether a given state is an accept state.
-	 * @param {Number} [state] The state to check.
-	 * @returns {Set|Boolean} The set of accept states if no arg, or whether the arg is an accept state.
+	 * Check whether a given state is an accept state.
+	 * @param {Number} state The state to check.
+	 * @returns {Boolean}
 	 */
 	accept(state) {
-		if (state === undefined) {
-			return this._accept;
-		}
 		return this._accept.has(this.state(state));
 	}
 
 	/**
-	 * Return the set of generating states (states which have paths to an accept state), or whether the given state is generating.
-	 * @param {Number} [state] The state to check.
-	 * @returns {Set|Boolean} The set of generating states if no arg, or whether the arg is generating.
+	 * Iterate over the accept states.
+	 * @returns {Iterator<Number>} The set of accept states if no arg, or whether the arg is an accept state.
+	 */
+	*acceptStates() {
+		yield* this._accept;
+	}
+
+	/**
+	 * Return whether there is a transition from one state to another.
+	 * @param {Number} origin The origin state ID.
+	 * @param {Number} target The origin state ID.
+	 * @returns {Boolean}
+	 */
+	hasTransition(origin, target) {
+		origin = this.state(origin);
+		target = this.state(target);
+		if (!origin || !target) {
+			return;
+		}
+		return this._transitions.get(origin).has(target);
+	}
+
+	/**
+	 * Check whether the given state is generating (has a path to an accept state).
+	 * @param {Number} state The state to check.
+	 * @returns {Boolean}
 	 */
 	generating(state) {
-		if (state === undefined) {
-			return this._generating;
-		}
 		return this._generating.has(this.state(state));
 	}
 
@@ -156,14 +173,11 @@ class DFA {
 	}
 
 	/**
-	 * Return the set of reachable states (states which have paths from the start state), or whether the given state is reachable.
+	 * Check whether the given state is reachable (has a path from the start state).
 	 * @param {Number} [state] The state to check.
-	 * @returns {Set|Boolean} The set of reachable states if no arg, or whether the arg is reachable.
+	 * @returns {Boolean}
 	 */
 	reachable(state) {
-		if (state === undefined) {
-			return this._reachable;
-		}
 		return this._reachable.has(this.state(state));
 	}
 
@@ -195,12 +209,13 @@ class DFA {
 	}
 
 	/**
-	 * @returns {Iterator} Iterator for the DFA's state IDs.
+	 * @returns {Iterator<Number>} Iterator for the DFA's state IDs.
 	 */
 	states() {
 		return this._states.keys();
 	}
 
+	/*
 	stateData(state) {
 		state = this.state(state);
 		if (!state) {
@@ -215,6 +230,7 @@ class DFA {
 			transitions: this.transitions(state),
 		}
 	}
+	*/
 
 	/**
 	 * Return the symbols of a transition from one state to another.
@@ -232,44 +248,35 @@ class DFA {
 	}
 
 	/**
-	 * Return the potential target states of a transition from a given state.
+	 * Iterate over the potential target states of a transition from a given state.
 	 * @param {Number} origin The origin state ID.
-	 * @param {String} [symbol] The symbol on which to transition. If not given, all potential targets will be returned.
-	 * @returns {Set} Set of potential targets.
+	 * @param {String} [symbol] The symbol on which to transition. If not given, all potential targets will be yielded.
+	 * @returns {Iterator<Number>} An iterator over the potential targets.
 	 */
-	targets(origin, symbol) {
+	*targets(origin, symbol) {
 		origin = this.state(origin);
 		if (!origin) {
-			return new Set();
+			return;
 		}
 		if (symbol === undefined) {
-			return new Set(...this._transitions.get(origin).keys());
+			yield* this._transitions.get(origin).keys();
+			return;
 		}
 		// TODO
 		throw new Error("targets() incomplete");
 	}
 
 	/**
-	 * Return whether there is a transition from one state to another.
+	 * Iterate over the potential target states of a transition from a given state.
+	 * @param {Number} origin The origin state ID.
+	 * @returns {Iterator<Array>} An iterator where each item has the form [target : Number, symbols : SymbolGroup].
 	 */
-	transition(origin, target) {
-		return this.symbols(origin, target);
-	}
-
-	/**
-	 * Return a map of transitions from a state, or all transitions.
-	 * @param {Number} [origin] The origin state ID.
-	 * @returns {Map} A map from target : Number to symbols : SymbolGroup, or from origin to such a map.
-	 */
-	transitions(origin) {
-		if (origin === undefined) {
-			return this._transitions;
-		}
+	*transitions(origin) {
 		origin = this.state(origin);
 		if (!origin) {
 			return;
 		}
-		return this._transitions.get(origin);
+		yield* this._transitions.get(origin);
 	}
 
 	/**
@@ -279,7 +286,7 @@ class DFA {
 	calculateGenerating() {
 		this._generating = new Set();
 
-		for (const state of this.accept()) {
+		for (const state of this.acceptStates()) {
 			this.explore(state, this._generating, true);
 		}
 
@@ -302,21 +309,63 @@ class DFA {
 		freeze(this._reachable);
 	}
 
+	/**
+	 * Delete the transition between the origin and the target.
+	 * @param {Number} origin The origin state ID.
+	 * @param {Number} target The target state ID.
+	 */
+	deleteTransition(origin, target) {
+		origin = this.state(origin);
+		target = this.state(target);
+
+		if (!origin || !target) {
+			return this;
+		}
+
+		let dfa = this;
+		let transitions = dfa._transitions.get(origin); // Map of transitions from the origin
+		if (!this._mutable) {
+			dfa = dfa.copy();
+			dfa._transitions = copy(dfa._transitions);
+			transitions = copy(transitions);
+			dfa._transitions.set(origin, transitions);
+		}
+
+		// Delete the transition
+		transitions.delete(target);
+
+		dfa.calculateGenerating();
+		dfa.calculateReachable();
+
+		if (!this._mutable) {
+			freeze(transitions);
+			freeze(dfa._transitions);
+			freeze(dfa);
+		}
+		return dfa;
+	}
+
+	/**
+	 * Perform a DFS from (and including) the given state on its transitions.
+	 * @param {Number} state The state to start from. If it has been visited already, explore() will do nothing.
+	 * @param {Set<Number>} visited The set of visited states. This will be modified by the function.
+	 * @param {Boolean} [backwards = false] Whether to go backwards (so states that transition TO the given state will be explored instead).
+	 * @returns {Set<Number>} The (modified) set of visited states.
+	 */
 	explore(state, visited, backwards) {
 		backwards = backwards || false;
 		if (visited.has(state)) {
 			return visited;
 		}
-		console.log("Visited " + state);
 		visited.add(state);
 		if (backwards) {
 			for (const origin of this.states()) {
-				if (this.transition(origin, state)) {
+				if (this.hasTransition(origin, state)) {
 					this.explore(origin, visited, backwards);
 				}
 			}
 		} else {
-			for (const [target, ] of this.transitions(state)) {
+			for (const target of this.targets(state)) {
 				this.explore(target, visited, backwards);
 			}
 		}
@@ -325,6 +374,8 @@ class DFA {
 
 	/**
 	 * Set a new start state.
+	 * @param {Number} state The new start state.
+	 * @returns {DFA} The new DFA.
 	 */
 	setStart(state) {
 		state = this.state(state);
@@ -345,7 +396,10 @@ class DFA {
 	}
 
 	/**
-	 * Update whether a state is an accept state or not.
+	 * Set whether a state is an accept state or not.
+	 * @param {Number} state The state to set.
+	 * @param {Boolean} accept Whether it should be an accept state.
+	 * @returns {DFA} The new DFA.
 	 */
 	setAccept(state, accept) {
 		state = this.state(state);
@@ -378,7 +432,10 @@ class DFA {
 	}
 
 	/**
-	 * Update the name of a state.
+	 * Set the name of a state.
+	 * @param {Number} state The state to set.
+	 * @param {String} name The new name.
+	 * @returns {DFA} The new DFA.
 	 */
 	setName(state, name) {
 		state = this.state(state);
@@ -403,7 +460,7 @@ class DFA {
 	}
 
 	/**
-	 * Update the symbols of a transition.
+	 * Set the symbols of a transition.
 	 * @param {Number} id ID of the origin state.
 	 * @param {Number} target ID of the target state.
 	 * @param {String|SymbolGroup} symbols The new symbol group.
@@ -419,7 +476,7 @@ class DFA {
 		}
 
 		symbols = new SymbolGroup(symbols);
-		if (symbols.equals(this.transition(origin, target))) {
+		if (symbols.equals(this.symbols(origin, target))) {
 			return this;
 		}
 
@@ -444,7 +501,7 @@ class DFA {
 	}
 
 	/**
-	 * Update the target of a transition. If the new target already has a transition set, merge them.
+	 * Set the target of a transition. If the new target already has a transition set, merge them.
 	 * @param {Number} origin The origin state ID.
 	 * @param {Number} oldTarget The old target state ID.
 	 * @param {Number} newTarget The new target state ID.
@@ -455,7 +512,7 @@ class DFA {
 		oldTarget = this.state(oldTarget);
 		newTarget = this.state(newTarget);
 
-		if (!origin || !oldTarget || !newTarget || oldTarget === newTarget || !this.transition(origin, oldTarget)) {
+		if (!origin || !oldTarget || !newTarget || oldTarget === newTarget || !this.hasTransition(origin, oldTarget)) {
 			return this;
 		}
 		let dfa = this;
@@ -467,7 +524,7 @@ class DFA {
 			dfa._transitions.set(origin, transitions);
 		}
 
-		let newSymbols = transitions.get(oldTarget).merge(transitions.get(newTarget));
+		const newSymbols = transitions.get(oldTarget).merge(transitions.get(newTarget));
 		transitions.delete(oldTarget);
 		transitions.set(newTarget, newSymbols);
 
@@ -484,6 +541,8 @@ class DFA {
 
 	/**
 	 * Toggle whether a state is an accept state or not.
+	 * @param {Number} state The state.
+	 * @returns {DFA} The new DFA.
 	 */
 	toggleAccept(state) {
 		return this.setAccept(state, !this.accept(state));
