@@ -44,8 +44,6 @@ class StateList extends Component {
 
 	render() {
 		const dfa = this.props.dfa;
-		console.log("DFA updated");
-		console.log(dfa);
 		const rows = this.state.order.map((state) => {
 			return <tr key={state} className={'state ' + (!dfa.reachable(state) ? 'state-unreachable ' : '') + (dfa.accept(state) ? 'state-accept ' : '') + (!dfa.generating(state) ? 'state-nongenerating ' : '')}>
 				<td>

@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import Vector from './Vector.js';
+import {copy} from '../util.js';
 import './VisualEditor.css';
 
 class VisualEditor extends Component {
@@ -25,7 +26,38 @@ class VisualEditor extends Component {
 	}
 
 	componentDidUpdate() {
+		console.log("VisualEditor updated.");
 		//this.drawTransitions();
+	}
+
+	componentWillReceiveProps(nextProps) {
+		if (this.props.dfa.states() === nextProps.dfa.states()) {
+			return;
+		}
+		// Check if any states have been added
+		for (const state of nextProps.dfa.states()) {
+			if (!this.state.positions.has(state)) {
+				// Put them in the center of the editor by default
+				this.setState((prevState, prevProps) => {
+					const newPositions = copy(prevState.positions);
+					newPositions.set(state, new Vector(this.width / 2, this.height / 2));
+					return {
+						positions: newPositions
+					}
+				});
+			}
+		}
+	}
+
+	shouldComponentUpdate(nextProps, nextState) {
+		// Component only needs to update if the DFA or positions changed
+		if (this.props.dfa !== nextProps.dfa) {
+			return true;
+		}
+		if (this.state.positions !== nextState.positions) {
+			return true;
+		}
+		return false;
 	}
 
 	startDragging(e, state) {
@@ -40,7 +72,7 @@ class VisualEditor extends Component {
 		const newDragPos = new Vector(e.clientX, e.clientY);
 		const diff = newDragPos.minus(this.dragPos);
 		this.setState((state, props) => {
-			const newPositions = new Map(state.positions);
+			const newPositions = copy(state.positions);
 			const oldPos = state.positions.get(this.dragging);
 			const newPos = oldPos.plus(diff);
 			newPositions.set(this.dragging, newPos);
@@ -56,17 +88,27 @@ class VisualEditor extends Component {
 		this.dragging = 0;
 	}
 
-	// Return a control point, which is offset perpendicularly from the midpoint of two points.
+	/**
+	 * Return a control point, which is offset perpendicularly from the midpoint of two points.
+	 * @param {Vector} start The start point.
+	 * @param {Vector} end The end point.
+	 * @param {Number} offset The distance to offset by.
+	 * @returns {Vector} The control point.
+	 */
 	controlPoint(start, end, offset) {
 		const mid = start.midpoint(end);
-		let angle = start.angleTo(end);
-		angle += Math.PI / 2; // Now make it perpendicular
+		const angle = start.angleTo(end) + Math.PI / 2;
 		return new Vector(
 			Math.floor(mid.x - Math.cos(angle) * offset),
 			Math.floor(mid.y - Math.sin(angle) * offset)
 		);
 	}
 
+	/**
+	 * Normalize an angle so that -π < angle ≤ π.
+	 * @param {Number} angle The angle in radians.
+	 * @returns {Number} The normalized angle.
+	 */
 	normalizeAngle(angle) {
 		if (angle > Math.PI) {
 			while (angle > Math.PI) {
@@ -90,7 +132,14 @@ class VisualEditor extends Component {
 		}
 	}
 
-	// Return a position on a quadratic curve at a given t value
+	/**
+	 * Return a position on a quadratic curve at a given t value.
+	 * @param {Vector} start The curve's start point.
+	 * @param {Vector} control The curve's control point.
+	 * @param {Vector} end The curve's end point.
+	 * @param {Number} t The t value, between 0 and 1.
+	 * @returns {Vector} The position at the t value.
+	 */
 	quadraticCurveAt(start, control, end, t) {
 		// This is just the quadratic Bezier formula
 		let ret = start.by(Math.pow(1 - t, 2));
@@ -99,6 +148,9 @@ class VisualEditor extends Component {
 		return ret;
 	}
 
+	/**
+	 * Set the positions of the states so that they are arranged in a circle around the center of the editor.
+	 */
 	resetPositions() {
 		this.setState((state, props) => {
 			const positions = new Map(); // Stores the positions of each state
@@ -118,14 +170,29 @@ class VisualEditor extends Component {
 		});
 	}
 
+	/**
+	 * Get the x-coordinate of a state.
+	 * @param {Number} state
+	 * @returns {Number}
+	 */
 	x(state) {
 		return this.state.positions.get(state).x;
 	}
 
+	/**
+	 * Get the y-coordinate of a state.
+	 * @param {Number} state
+	 * @returns {Number}
+	 */
 	y(state) {
 		return this.state.positions.get(state).y;
 	}
 
+	/**
+	 * Get the position of a state.
+	 * @param {Number} state
+	 * @returns {Vector}
+	 */
 	pos(state) {
 		return this.state.positions.get(state);
 	}
@@ -133,9 +200,9 @@ class VisualEditor extends Component {
 	/**
 	 * Return a polyline consisting of two short lines in the shape of an arrowhead.
 	 * @param {Vector} pos The position of the tip of the arrow.
-	 * @param {Number} angle The angle at which the arrow is pointing. 0 = left, pi / 2 = down.
+	 * @param {Number} angle The angle at which the arrow is pointing. 0 = left, π/2 = down.
 	 * @param {Number} size The length of each line.
-	 * @param {Number} theta The angle between the arrow's lines. Should be less than pi.
+	 * @param {Number} theta The angle between the arrow's lines. Should be less than π.
 	 */
 	renderArrowHead(pos, angle, size, theta) {
 		const t1 = angle - theta / 2;
@@ -150,6 +217,7 @@ class VisualEditor extends Component {
 
 	/**
 	 * Return an array of SVG groups for all transitions from a state.
+	 * @returns {React.Element[]}
 	 */
 	renderTransitions() {
 		const dfa = this.props.dfa;
@@ -221,7 +289,7 @@ class VisualEditor extends Component {
 					className="transition"
 				>
 					<g className="arrow">
-						<path className="shaft" d={d} onClick={() => this.props.promptDeleteTransition(origin, target)} />
+						<path className="shaft" d={d} onClick={() => this.props.promptRemoveTransition(origin, target)} />
 						{arrowHead}
 					</g>
 					<text
@@ -299,7 +367,7 @@ class VisualEditor extends Component {
 					className="transition"
 				>
 					<g className="arrow">
-						<path className="shaft" d={d} onClick={() => this.props.promptDeleteTransition(state, state)} />
+						<path className="shaft" d={d} onClick={() => this.props.promptRemoveTransition(state, state)} />
 						{arrowHead}
 					</g>
 					<text
@@ -358,18 +426,20 @@ class VisualEditor extends Component {
 		}
 
 		return (
-			<svg
-				ref="svg"
-				className="VisualEditor"
-				width={this.width}
-				height={this.height}
-				onMouseMove={(e) => {this.maybeDrag(e)}}
-				onMouseLeave={() => {this.stopDragging()}}
-				onMouseUp={() => {this.stopDragging()}}
-			>
-				{this.renderTransitions()}
-				{states}
-			</svg>
+			<div className="VisualEditor">
+				<svg
+					ref="svg"
+					width={this.width}
+					height={this.height}
+					onMouseMove={(e) => {this.maybeDrag(e)}}
+					onMouseLeave={() => {this.stopDragging()}}
+					onMouseUp={() => {this.stopDragging()}}
+				>
+					{this.renderTransitions()}
+					{states}
+				</svg>
+				<button onClick={() => this.props.handleAddState()}>Add State</button>
+			</div>
 		);
 	}
 }

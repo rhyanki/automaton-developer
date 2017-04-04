@@ -18,69 +18,78 @@ class DFAEditor extends Component {
 		}
 	}
 
+	componentDidUpdate() {
+		console.log("DFAEditor updated.");
+	}
+
+	shouldComponentUpdate(nextProps, nextState) {
+		// Component only needs to update if the DFA changed
+		if (this.state.dfa !== nextState.dfa) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Update the DFAEditor's state with a new DFA, based on the result of calling one of the DFA's methods.
+	 * @param {String} methodName The name of the DFA method to call.
+	 * @param {*} args The args to pass to the DFA method call.
+	 */
 	handle(methodName, args) {
-		return (prevState, props) => {
+		this.setState((prevState, props) => {
 			if (!(prevState.dfa[methodName] instanceof Function)) {
 				console.log(methodName + " is not a valid DFA method!");
 				throw new Error(methodName + " is not a valid DFA method!");
 			}
-			return {
-				dfa: prevState.dfa[methodName](...([...arguments].slice(1)))
-			};
-		};
-	}
-
-	handleToggleAccept(state, accept) {
-		this.setState(this.handle('toggleAccept', state));
-	}
-
-	handleUpdateStart(state) {
-		this.setState(this.handle('setStart', state));
-	}
-
-	handleUpdateStateName(state, name) {
-		this.setState(this.handle('setName', state, name));
-	}
-
-	handleUpdateTransitionTarget(origin, oldTarget, newTarget) {
-		this.setState((prevState, props) => {
-			if (prevState.dfa.hasTransition(origin, newTarget)) {
-				if (!window.confirm("There is already a transition to that state, so this will merge the two transitions. Do you wish to continue?")) {
-					return;
-				}
-			}
-			return {
-				dfa: prevState.dfa.setTransitionTarget(origin, oldTarget, newTarget)
-			};
-		});
-	}
-
-	promptDeleteTransition(origin, target) {
-		this.setState((prevState, props) => {
-			if (!window.confirm("Are you sure you want to delete this transition?")) {
-				return;
-			}
-			return {
-				dfa: prevState.dfa.deleteTransition(origin, target)
-			};
-		});
-	}
-
-	promptUpdateTransitionSymbols(origin, target) {
-		this.setState((prevState, props) => {
-			let symbols = window.prompt("Enter a new symbol or symbols.", prevState.dfa.symbols(origin, target));
-			if (symbols === null) {
-				return;
-			}
 			try {
 				return {
-					dfa: prevState.dfa.setTransitionSymbols(origin, target, symbols)
+					dfa: prevState.dfa[methodName](...([...arguments].slice(1)))
 				};
 			} catch (e) {
 				window.alert(e.message);
 				return;
 			}
 		});
+	}
+
+	handleAddState(name) {
+		this.handle('addState', name);
+	}
+
+	handleToggleAccept(state) {
+		this.handle('toggleAccept', ...arguments);
+	}
+
+	handleUpdateStart(state) {
+		this.handle('setStart', ...arguments);
+	}
+
+	handleUpdateStateName(state, name) {
+		this.handle('setName', ...arguments);
+	}
+
+	handleUpdateTransitionTarget(origin, oldTarget, newTarget) {
+		if (this.state.dfa.hasTransition(origin, newTarget)) {
+			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions. Do you wish to continue?")) {
+				return;
+			}
+		}
+		this.handle('setTransitionTarget', ...arguments)
+	}
+
+	promptRemoveTransition(origin, target) {
+		if (!window.confirm("Are you sure you want to delete this transition?")) {
+			return;
+		}
+		this.handle('removeTransition', ...arguments);
+	}
+
+	promptUpdateTransitionSymbols(origin, target) {
+		const symbols = window.prompt("Enter a new symbol or symbols.", this.state.dfa.symbols(origin, target));
+		if (symbols === null) {
+			return;
+		}
+		this.handle('setTransitionSymbols', origin, target, symbols);
 	}
 
 	render() {
@@ -96,9 +105,10 @@ class DFAEditor extends Component {
 			</div>
 			<div className="col-md-6">
 				<VisualEditor dfa={this.state.dfa}
+				handleAddState={this.handleAddState}
 				handleToggleAccept={this.handleToggleAccept}
 				handleUpdateStateName={this.handleUpdateStateName}
-				promptDeleteTransition={this.promptDeleteTransition}
+				promptRemoveTransition={this.promptRemoveTransition}
 				promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 				/>
 			</div>

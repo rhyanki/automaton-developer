@@ -7,22 +7,24 @@ import SymbolGroup from './SymbolGroup.js';
 		alphabet: SymbolGroup,
 		_start: Number,
 
+		// Set of all states.
+		_states: Set<state : Number>,
+
 		// Map of states to their names
-		_states: Map([
-			[id: Number, name: String]
-		]),
+		_names: Map<state : Number, name : String>,
 
 		// Set of accept states
-		_accept: Set({}),
+		_accept: Set<state : Number>,
 
 		// Set of current states, if stepping through the machine
-		_current: Set({}),
+		_current: Set<state : Number>,
 
-		_transitions: Map([
-			[origin: Number, transition: Map([
-				[target: Number, symbols: SymbolGroup]
-			])
-		])
+		_transitions: Map<
+			origin: Number, transition: Map<
+				target: Number,
+				symbols: SymbolGroup
+			>
+		>
 
 		// A single object shared by the DFA and all its copies
 		_shared: {
@@ -38,6 +40,7 @@ import SymbolGroup from './SymbolGroup.js';
  * on which they are called, and return it.
  * Otherwise, they will create a minimal copy (maintaining as many references as possible) and return
  * the copy.
+ * If not mutable, it is possible to do things like compare oldDFA.states() === newDFA.states() to see if any states have been added or removed.
  */
 class DFA {
 	constructor(template) {
@@ -55,7 +58,8 @@ class DFA {
 		};
 
 		this._start = 0;
-		this._states = new Map();
+		this._states = new Set();
+		this._names = new Map();
 		this._accept = new Set();
 		this._transitions = new Map();
 
@@ -63,7 +67,8 @@ class DFA {
 		if (template.states instanceof Array) {
 			for (let i = 0; i < template.states.length; i++) {
 				const state = this._shared.nextID;
-				this._states.set(state, template.states[i].name);
+				this._states.add(state);
+				this._names.set(state, template.states[i].name);
 				if (template.states[i].accept) {
 					this._accept.add(state);
 				}
@@ -111,6 +116,7 @@ class DFA {
 		}
 		freeze(this._accept);
 		freeze(this._states);
+		freeze(this._names);
 		freeze(this._transitions);
 		freeze(this);
 	}
@@ -132,11 +138,11 @@ class DFA {
 	}
 
 	/**
-	 * Iterate over the accept states.
-	 * @returns {Iterator<Number>} The set of accept states if no arg, or whether the arg is an accept state.
+	 * Get the accept states.
+	 * @returns {Set<Number>} The set of accept states.
 	 */
-	*acceptStates() {
-		yield* this._accept;
+	acceptStates() {
+		return this._accept;
 	}
 
 	/**
@@ -169,7 +175,7 @@ class DFA {
 	 * @returns {String|undefined} The state's name, or undefined if not a state.
 	 */
 	name(state) {
-		return this._states.get(state);
+		return this._names.get(state);
 	}
 
 	/**
@@ -209,10 +215,10 @@ class DFA {
 	}
 
 	/**
-	 * @returns {Iterator<Number>} Iterator for the DFA's state IDs.
+	 * @returns {Set<Number>} Set of the DFA's states.
 	 */
 	states() {
-		return this._states.keys();
+		return this._states;
 	}
 
 	/*
@@ -267,16 +273,58 @@ class DFA {
 	}
 
 	/**
-	 * Iterate over the potential target states of a transition from a given state.
-	 * @param {Number} origin The origin state ID.
-	 * @returns {Iterator<Array>} An iterator where each item has the form [target : Number, symbols : SymbolGroup].
+	 * Get the potential transitions from a given state, or all transitions if not provided.
+	 * @param {Number} [origin] The origin state ID.
+	 * @returns {Map<Number, SymbolGroup>|Map<Number, Map>} An map of the form [target : Number, symbols : SymbolGroup] if origin given, otherwise [origin : Number, transitions : Map<Number, SymbolGroup>]. Empty map if origin invalid.
 	 */
-	*transitions(origin) {
+	transitions(origin) {
+		if (origin === undefined) {
+			return this._transitions;
+		}
 		origin = this.state(origin);
 		if (!origin) {
-			return;
+			return new Map();
 		}
-		yield* this._transitions.get(origin);
+		return this._transitions.get(origin);
+	}
+
+	/**
+	 * Add a new blank state.
+	 * @param {String} [name] The name of the new state (default "New state").
+	 * @returns {DFA}
+	 */
+	addState(name) {
+		if (name === undefined) {
+			name = "New state";
+		}
+
+		// Use a unique ID for the new state which has never been used by this DFA or its family of clones.
+		const id = this._shared.nextID;
+		this._shared.nextID++;
+
+		let dfa = this;
+
+		if (!this._mutable) {
+			dfa = dfa.copy();
+			dfa._states = copy(dfa._states);
+			dfa._names = copy(dfa._names);
+			dfa._transitions = copy(dfa._transitions);
+		}
+
+		dfa._states.add(id);
+		dfa._names.set(id, name);
+		dfa._transitions.set(id, new Map());
+
+		// Note that the new state is trivially neither reachable nor generating, so no need to recalculate those.
+
+		if (!this._mutable) {
+			freeze(dfa._transitions);
+			freeze(dfa._names);
+			freeze(dfa._states);
+			freeze(dfa);
+		}
+
+		return dfa;
 	}
 
 	/**
@@ -310,11 +358,38 @@ class DFA {
 	}
 
 	/**
-	 * Delete the transition between the origin and the target.
+	 * Perform a DFS from (and including) the given state on its transitions.
+	 * @param {Number} state The state to start from. If it has been visited already, explore() will do nothing.
+	 * @param {Set<Number>} visited The set of visited states. This will be modified by the function.
+	 * @param {Boolean} [backwards = false] Whether to go backwards (so states that transition TO the given state will be explored instead).
+	 * @returns {Set<Number>} The (modified) set of visited states.
+	 */
+	explore(state, visited, backwards) {
+		backwards = backwards || false;
+		if (visited.has(state)) {
+			return visited;
+		}
+		visited.add(state);
+		if (backwards) {
+			for (const origin of this.states()) {
+				if (this.hasTransition(origin, state)) {
+					this.explore(origin, visited, backwards);
+				}
+			}
+		} else {
+			for (const target of this.targets(state)) {
+				this.explore(target, visited, backwards);
+			}
+		}
+		return visited;
+	}
+
+	/**
+	 * Remove the transition between the origin and the target.
 	 * @param {Number} origin The origin state ID.
 	 * @param {Number} target The target state ID.
 	 */
-	deleteTransition(origin, target) {
+	removeTransition(origin, target) {
 		origin = this.state(origin);
 		target = this.state(target);
 
@@ -343,33 +418,6 @@ class DFA {
 			freeze(dfa);
 		}
 		return dfa;
-	}
-
-	/**
-	 * Perform a DFS from (and including) the given state on its transitions.
-	 * @param {Number} state The state to start from. If it has been visited already, explore() will do nothing.
-	 * @param {Set<Number>} visited The set of visited states. This will be modified by the function.
-	 * @param {Boolean} [backwards = false] Whether to go backwards (so states that transition TO the given state will be explored instead).
-	 * @returns {Set<Number>} The (modified) set of visited states.
-	 */
-	explore(state, visited, backwards) {
-		backwards = backwards || false;
-		if (visited.has(state)) {
-			return visited;
-		}
-		visited.add(state);
-		if (backwards) {
-			for (const origin of this.states()) {
-				if (this.hasTransition(origin, state)) {
-					this.explore(origin, visited, backwards);
-				}
-			}
-		} else {
-			for (const target of this.targets(state)) {
-				this.explore(target, visited, backwards);
-			}
-		}
-		return visited;
 	}
 
 	/**
@@ -446,13 +494,13 @@ class DFA {
 		var dfa = this;
 		if (!this._mutable) {
 			dfa = dfa.copy();
-			dfa._states = copy(dfa._states);
+			dfa._names = copy(dfa._names);
 		}
 
-		dfa._states.set(state, name);
+		dfa._names.set(state, name);
 
 		if (!this._mutable) {
-			freeze(dfa._states);
+			freeze(dfa._names);
 			freeze(dfa);
 		}
 
