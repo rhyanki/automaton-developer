@@ -47,6 +47,8 @@ import SymbolGroup from './SymbolGroup.js';
  */
 class NFA {
 	constructor(template) {
+		this._mutable = true;
+
 		// If this is a copy of an existing NFA ...
 		if (template instanceof NFA) {
 			for (var k in template) {
@@ -93,11 +95,9 @@ class NFA {
 		this._calculateGenerating();
 		this._calculateWhetherDFA();
 
-		// Mutable by default
-		if (template.mutable !== undefined && !template.mutable) {
+		// Immutable by default
+		if (!template.mutable) {
 			this.immutable();
-		} else {
-			this._mutable = true;
 		}
 	}
 
@@ -136,7 +136,7 @@ class NFA {
 	_calculateWhetherDFA() {
 		// For each state, check whether any of its transition symbol groups intersect
 		for (const [, transitions] of this.transitions) {
-			if (SymbolGroup.intersect(transitions.values())) {
+			if (SymbolGroup.overlap(transitions.values())) {
 				this._dfa = false;
 				return;
 			}
@@ -419,27 +419,6 @@ class NFA {
 	}
 
 	/**
-	 * Set a new start state.
-	 * @param {Number} state The new start state.
-	 * @returns {NFA} The new NFA.
-	 */
-	setStart(state) {
-		state = this.state(state);
-		if (this.isStart(state)) {
-			return this;
-		}
-
-		const nfa = this.mutable();
-		nfa._start = state;
-		nfa._calculateReachable();
-
-		if (!this._mutable) {
-			nfa.immutable();
-		}
-		return nfa;
-	}
-
-	/**
 	 * Set whether a state is an accept state or not.
 	 * @param {Number} state The state to set.
 	 * @param {Boolean} accept Whether it should be an accept state.
@@ -469,6 +448,27 @@ class NFA {
 			nfa.immutable();
 		}
 
+		return nfa;
+	}
+
+	/**
+	 * Set a new start state.
+	 * @param {Number} state The new start state.
+	 * @returns {NFA} The new NFA.
+	 */
+	setStart(state) {
+		state = this.state(state);
+		if (this.isStart(state)) {
+			return this;
+		}
+
+		const nfa = this.mutable();
+		nfa._start = state;
+		nfa._calculateReachable();
+
+		if (!this._mutable) {
+			nfa.immutable();
+		}
 		return nfa;
 	}
 

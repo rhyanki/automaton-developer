@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import {copy, freeze} from '../../Util/immutability.js';
+import {List} from 'immutable';
 import TransitionList from './TransitionList.js';
 import './ListEditor.css';
 
@@ -11,9 +11,27 @@ class ListEditor extends Component {
 		this.handleMoveStateUp = this.handleMoveStateUp.bind(this);
 
 		this.state = {
-			order: [...this.props.nfa.states]
+			order: List(this.props.nfa.states)
 		}
-		freeze(this.state.order);
+		Object.freeze(this.state.order);
+	}
+
+	componentWillReceiveProps(nextProps) {
+		if (this.props.nfa.states === nextProps.nfa.states) {
+			return;
+		}
+		let newOrder = this.state.order.asMutable();
+		// Remove any states that no longer exist
+		newOrder = newOrder.filter((state) => nextProps.nfa.state(state));
+
+		// Add any new states
+		for (const state of nextProps.nfa.states) {
+			if (!this.state.order.includes(state)) {
+				newOrder.push(state);
+			}
+		}
+
+		this.setState({order: newOrder});
 	}
 
 	handleMoveStateDown(id) {
@@ -33,11 +51,11 @@ class ListEditor extends Component {
 			if (pos1 === -1 || pos2 < 0 || pos2 >= state.order.length) {
 				return;
 			}
-			let order = copy(state.order);
-			order[pos1] = order[pos2];
-			order[pos2] = id;
+			const newOrder = state.order.withMutations(order => {
+				order.set(pos1, order.get(pos2)).set(pos2, id);
+			});
 			return {
-				order: order
+				order: newOrder
 			}
 		});
 	}

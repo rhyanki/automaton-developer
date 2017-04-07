@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
+import { Map } from 'immutable';
 import Vector from '../../Util/Vector.js';
-import {copy} from '../../Util/immutability.js';
 import './VisualEditor.css';
 
 class VisualEditor extends Component {
@@ -19,8 +19,9 @@ class VisualEditor extends Component {
 		this.dragPos = null;
 
 		this.state = {
-			positions: new Map(),
+			positions: Map(),
 		};
+		Object.freeze(this.state);
 	}
 
 	componentDidMount() {
@@ -41,10 +42,8 @@ class VisualEditor extends Component {
 			if (!this.state.positions.has(state)) {
 				// Put them in the center of the editor by default
 				this.setState((prevState, prevProps) => {
-					const newPositions = copy(prevState.positions);
-					newPositions.set(state, this.DEFAULT_POS);
 					return {
-						positions: newPositions
+						positions: prevState.positions.set(state, this.DEFAULT_POS)
 					}
 				});
 			}
@@ -73,13 +72,11 @@ class VisualEditor extends Component {
 		}
 		const newDragPos = new Vector(e.clientX, e.clientY);
 		const diff = newDragPos.minus(this.dragPos);
-		this.setState((state, props) => {
-			const newPositions = copy(state.positions);
-			const oldPos = state.positions.get(this.dragging);
+		this.setState((prevState, prevProps) => {
+			const oldPos = prevState.positions.get(this.dragging);
 			const newPos = oldPos.plus(diff);
-			newPositions.set(this.dragging, newPos);
 			return {
-				positions: newPositions,
+				positions: prevState.positions.set(this.dragging, newPos)
 			};
 		});
 		this.dragPos = newDragPos;
@@ -145,7 +142,7 @@ class VisualEditor extends Component {
 	 */
 	resetPositions() {
 		this.setState((state, props) => {
-			const positions = new Map(); // Stores the positions of each state
+			const positions = Map().asMutable(); // Stores the positions of each state
 			const numStates = props.nfa.numStates;
 
 			let angle = Math.PI; // The angle at which the next state should be placed
@@ -158,7 +155,7 @@ class VisualEditor extends Component {
 				positions.set(state, new Vector(x, y));
 				angle += Math.PI * 2 / numStates * direction;
 			}
-			return {positions: positions};
+			return {positions: positions.asImmutable()};
 		});
 	}
 
@@ -217,7 +214,7 @@ class VisualEditor extends Component {
 	renderTransitions() {
 		const nfa = this.props.nfa;
 		const output = [];
-		const angles = new Map(); // List of angles around the state's circle at which each transition arrow leaves
+		const angles = Map().asMutable(); // List of angles around the state's circle at which each transition arrow leaves
 
 		const ARROW_HEAD_SIZE = 10;
 		const ARROW_HEAD_ANGLE = Math.PI / 3;

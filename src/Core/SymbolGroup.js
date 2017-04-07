@@ -1,5 +1,4 @@
-//import {Set} from 'immutable';
-import {intersect} from '../Util/sets.js';
+import {Set} from 'immutable';
 
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
@@ -33,22 +32,24 @@ class SymbolGroup {
 	 * @param {Iterable<SymbolGroup>} symbolGroups
 	 * @returns {Boolean}
 	 */
-	static intersect(symbolGroups) {
-		// Symbol sets
-		const sets = [];
+	static overlap(symbolGroups) {
+		const allSymbols = Set().asMutable();
 		for (const group of symbolGroups) {
-			if (group._symbols) {
-				sets.push(group._symbols);
+			for (const symbol of group._symbols) {
+				if (allSymbols.has(symbol)) {
+					return true;
+				}
+				allSymbols.add(symbol);
 			}
 		}
-		return intersect(sets);
+		return false;
 	}
 
 	/**
 	 * @param {String} input The input string, containing any ASCII characters or ε. Backslash codes (such as \n) and ranges (such as a-z) are allowed. ~ is an alias for ε (no symbol). All whitespace is stripped unless following a backslash.
 	 */
 	constructor(input) {
-		this._symbols = new Set();
+		this._symbols = Set().asMutable();
 
 		if (!this._allowedCharsRegex.test(input)) {
 			throw new Error("Only ASCII characters are allowed for now.");
@@ -112,6 +113,7 @@ class SymbolGroup {
 		}
 
 		this._normalized = symbolsList.join(", ");
+		this._symbols.asImmutable();
 	}
 
 	/**
