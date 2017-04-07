@@ -138,10 +138,11 @@ class NFA {
 		// For each state, check whether any of its transition symbol groups intersect
 		for (const [, transitions] of this.transitions()) {
 			if (SymbolGroup.intersect(transitions.values())) {
-				return false;
+				this._dfa = false;
+				return;
 			}
 		}
-		return true;
+		this._dfa = true;
 	}
 
 	/**
@@ -237,7 +238,7 @@ class NFA {
 	/**
 	 * Return a shallow copy of this NFA.
 	 * It will be (shallowly) mutable, so it can have elements replaced if need be (any previously immutable elements will remain so).
-	 * Afterwards it must be frozen again.
+	 * Afterwards it must be made immutable again.
 	 */
 	copy() {
 		return new NFA(this);
@@ -287,9 +288,6 @@ class NFA {
 	 * @returns {Boolean}
 	 */
 	isDFA() {
-		if (this._dfa === undefined || this._dfa === null) {
-			this._calculateWhetherDFA();
-		}
 		return this._dfa;
 	}
 
@@ -312,9 +310,50 @@ class NFA {
 	}
 
 	/**
+	 * Remove a state.
+	 * @param {Number} state
+	 * @returns {NFA}
+	 */
+	removeState(state) {
+		state = this.state(state);
+
+		if (!state) {
+			return this;
+		}
+
+		let nfa = this;
+
+		if (!this._mutable) {
+			nfa = nfa.copy();
+			nfa._states = copy(nfa._states);
+			nfa._transitions = copy(nfa._transitions);
+			transitions = copy(transitions);
+			nfa._transitions.set(origin, transitions);
+		}
+
+		// Delete the transition
+		transitions.delete(target);
+
+		nfa._calculateGenerating();
+		nfa._calculateReachable();
+		if (!nfa.isDFA()) {
+			// It might have become a DFA
+			nfa._calculateWhetherDFA();
+		}
+
+		if (!this._mutable) {
+			freeze(transitions);
+			freeze(nfa._transitions);
+			freeze(nfa);
+		}
+		return nfa;
+	}
+
+	/**
 	 * Remove the transition between the origin and the target.
 	 * @param {Number} origin The origin state ID.
 	 * @param {Number} target The target state ID.
+	 * @returns {NFA}
 	 */
 	removeTransition(origin, target) {
 		origin = this.state(origin);

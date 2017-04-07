@@ -122,16 +122,6 @@ class VisualEditor extends Component {
 		return angle;
 	}
 
-	promptEditState(state) {
-		if (this.state.dragging) {
-			return;
-		}
-		const newName = window.prompt("Enter a state name.", this.props.nfa.name(state));
-		if (newName) {
-			this.props.handleUpdateStateName(state, newName);
-		}
-	}
-
 	/**
 	 * Return a position on a quadratic curve at a given t value.
 	 * @param {Vector} start The curve's start point.
@@ -289,7 +279,7 @@ class VisualEditor extends Component {
 					className="transition"
 				>
 					<g className="arrow">
-						<path className="shaft" d={d} onClick={() => this.props.promptRemoveTransition(origin, target)} />
+						<path className="shaft" d={d} onClick={() => this.props.confirmRemoveTransition(origin, target)} />
 						{arrowHead}
 					</g>
 					<text
@@ -367,7 +357,7 @@ class VisualEditor extends Component {
 					className="transition"
 				>
 					<g className="arrow">
-						<path className="shaft" d={d} onClick={() => this.props.promptRemoveTransition(state, state)} />
+						<path className="shaft" d={d} onClick={() => this.props.confirmRemoveTransition(state, state)} />
 						{arrowHead}
 					</g>
 					<text
@@ -409,11 +399,15 @@ class VisualEditor extends Component {
 				>
 					<i
 						className="fa fa-pencil btn-edit-state"
-						onClick={() => this.promptEditState(state)}
+						onClick={() => this.props.promptEditState(state)}
 					></i>
 					<i
 						className="fa fa-check btn-edit-state"
-						onClick={() => this.props.handleToggleAccept(state)}
+						onClick={() => this.props.toggleAccept(state)}
+					></i>
+					<i
+						className="fa fa-remove btn-edit-state"
+						onClick={() => this.props.confirmRemoveState(state)}
 					></i>
 				</foreignObject>
 				<text
@@ -438,7 +432,6 @@ class VisualEditor extends Component {
 					{this.renderTransitions()}
 					{states}
 				</svg>
-				<button onClick={() => this.props.handleAddState()}>Add State</button>
 			</div>
 		);
 	}

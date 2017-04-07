@@ -20,10 +20,17 @@ function copy(item) {
 }
 
 /**
- * Make an array, plain object, Set or Map (shallowly) immutable. Return the same item.
+ * Make an array, plain object, Set or Map (shallowly) immutable.
+ * Sets and Maps have their methods overridden to return copies of themselves instead.
+ * Return the same item.
  */
 function freeze(item) {
+	if (item._frozen) {
+		return item;
+	}
 	if (item instanceof Map) {
+		item.set = Map_set;
+		item.clear =
 		item.set = item.clear = item.delete = function() {
 			throw new Error("Cannot modify frozen Map.");
 		}
@@ -32,9 +39,22 @@ function freeze(item) {
 			throw new Error("Cannot modify frozen Set.");
 		}
 	}
-	// For debugging only
 	item._frozen = true;
 	return Object.freeze(item);
+}
+
+function Map_set(...args) {
+	console.log("set() called on frozen Map");
+	const setCopy = copy(this);
+	setCopy.set(...args);
+	return setCopy;
+}
+
+function Map_clear(...args) {
+	console.log("clear() called on frozen Map");
+	const setCopy = copy(this);
+	setCopy.clear(...args);
+	return setCopy;
 }
 
 export {copy, freeze};

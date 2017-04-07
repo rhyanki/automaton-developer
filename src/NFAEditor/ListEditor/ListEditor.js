@@ -50,16 +50,16 @@ class ListEditor extends Component {
 					<button onClick={() => this.handleMoveStateUp(state)}><i className="fa fa-chevron-up"></i></button>
 					<button onClick={() => this.handleMoveStateDown(state)}><i className="fa fa-chevron-down"></i></button>
 				</td>
-				<td><input name="start" type="radio" onChange={() => this.props.handleUpdateStart(state)} checked={nfa.start(state)} /></td>
+				<td><input name="start" type="radio" onChange={() => this.props.updateStart(state)} checked={nfa.start(state)} /></td>
 				<td>{state}</td>
-				<td><input type="text" className="form-control" value={nfa.name(state)} onChange={(e) => this.props.handleUpdateStateName(state, e.target.value)} /></td>
+				<td><input type="text" className="form-control" value={nfa.name(state)} onChange={(e) => this.props.updateStateName(state, e.target.value)} /></td>
 				<td>
 					<TransitionList nfa={nfa} state={state}
-					handleUpdateTransitionTarget={this.props.handleUpdateTransitionTarget}
+					handleUpdateTransitionTarget={this.props.updateTransitionTarget}
 					promptUpdateTransitionSymbols={this.props.promptUpdateTransitionSymbols} />
 				</td>
 				<td>
-					<input type="checkbox" onChange={(e) => this.props.handleUpdateAccept(state, e.target.checked)} checked={nfa.accept(state)} />
+					<input type="checkbox" onChange={(e) => this.props.updateAccept(state, e.target.checked)} checked={nfa.accept(state)} />
 				</td>
 			</tr>;
 		});

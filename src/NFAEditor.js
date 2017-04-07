@@ -77,7 +77,7 @@ class NFAEditor extends Component {
 		this.handle('setTransitionTarget', ...arguments)
 	}
 
-	promptRemoveTransition(origin, target) {
+	confirmRemoveTransition(origin, target) {
 		if (!window.confirm("Are you sure you want to delete this transition?")) {
 			return;
 		}
@@ -114,7 +114,7 @@ class NFAEditor extends Component {
 						handleAddState={this.handleAddState}
 						handleToggleAccept={this.handleToggleAccept}
 						handleUpdateStateName={this.handleUpdateStateName}
-						promptRemoveTransition={this.promptRemoveTransition}
+						confirmRemoveTransition={this.confirmRemoveTransition}
 						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 					/>
 				</div>
