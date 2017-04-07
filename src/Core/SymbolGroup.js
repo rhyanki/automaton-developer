@@ -1,3 +1,4 @@
+//import {Set} from 'immutable';
 import {intersect} from '../Util/sets.js';
 
 /**
@@ -29,14 +30,16 @@ class SymbolGroup {
 
 	/**
 	 * Check whether a set of SymbolGroups share any symbols between them.
-	 * @param {Iterable<SymbolGroup>} symbolGroups 
+	 * @param {Iterable<SymbolGroup>} symbolGroups
 	 * @returns {Boolean}
 	 */
 	static intersect(symbolGroups) {
 		// Symbol sets
 		const sets = [];
 		for (const group of symbolGroups) {
-			sets.push(group._symbols);
+			if (group._symbols) {
+				sets.push(group._symbols);
+			}
 		}
 		return intersect(sets);
 	}

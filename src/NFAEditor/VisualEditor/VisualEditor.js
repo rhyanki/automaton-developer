@@ -10,6 +10,8 @@ class VisualEditor extends Component {
 		this.width = 600; // Placeholders
 		this.height = 600;
 
+		this.DEFAULT_POS = new Vector(this.width / 2, this.height / 2);
+
 		this.STATE_RADIUS = 50;
 		this.NAME_SIZE = 14;
 
@@ -31,16 +33,16 @@ class VisualEditor extends Component {
 	}
 
 	componentWillReceiveProps(nextProps) {
-		if (this.props.nfa.states() === nextProps.nfa.states()) {
+		if (this.props.nfa.states === nextProps.nfa.states) {
 			return;
 		}
 		// Check if any states have been added
-		for (const state of nextProps.nfa.states()) {
+		for (const state of nextProps.nfa.states) {
 			if (!this.state.positions.has(state)) {
 				// Put them in the center of the editor by default
 				this.setState((prevState, prevProps) => {
 					const newPositions = copy(prevState.positions);
-					newPositions.set(state, new Vector(this.width / 2, this.height / 2));
+					newPositions.set(state, this.DEFAULT_POS);
 					return {
 						positions: newPositions
 					}
@@ -150,7 +152,7 @@ class VisualEditor extends Component {
 			const offset = Math.min(this.width, this.height) * 0.3; // The distance each state should start from the centre
 			const direction = -1; // -1 for clockwise, 1 for anticlockwise
 
-			for (const state of props.nfa.states()) {
+			for (const state of props.nfa.states) {
 				const x = Math.round(this.width * 0.5 + Math.cos(angle) * offset);
 				const y = Math.round(this.height * 0.5 - Math.sin(angle) * offset);
 				positions.set(state, new Vector(x, y));
@@ -166,7 +168,7 @@ class VisualEditor extends Component {
 	 * @returns {Number}
 	 */
 	x(state) {
-		return this.state.positions.get(state).x;
+		return this.pos(state).x;
 	}
 
 	/**
@@ -175,7 +177,7 @@ class VisualEditor extends Component {
 	 * @returns {Number}
 	 */
 	y(state) {
-		return this.state.positions.get(state).y;
+		return this.pos(state).y;
 	}
 
 	/**
@@ -184,6 +186,9 @@ class VisualEditor extends Component {
 	 * @returns {Vector}
 	 */
 	pos(state) {
+		if (!this.state.positions.has(state)) {
+			return this.DEFAULT_POS;
+		}
 		return this.state.positions.get(state);
 	}
 
@@ -217,12 +222,13 @@ class VisualEditor extends Component {
 		const ARROW_HEAD_SIZE = 10;
 		const ARROW_HEAD_ANGLE = Math.PI / 3;
 
-		for (const state of this.state.positions.keys()) {
+		for (const state of nfa.states) {
 			angles.set(state, []);
 		};
 
-		for (const [origin, originPos] of this.state.positions) {
-			for (const [target, symbols] of nfa.transitions(origin)) {
+		for (const origin of nfa.states) {
+			const originPos = this.pos(origin);
+			for (const [target, symbols] of nfa.transitionsFrom(origin)) {
 				if (origin === target) {
 					// Will need to make special case for self-connections
 					continue;
@@ -293,7 +299,7 @@ class VisualEditor extends Component {
 			}
 		}
 
-		for (const state of this.state.positions.keys()) {
+		for (const state of nfa.states) {
 			if (nfa.hasTransition(state, state)) {
 				const pos = this.pos(state);
 				let angs = angles.get(state);
@@ -377,10 +383,10 @@ class VisualEditor extends Component {
 	render() {
 		const states = [];
 		const nfa = this.props.nfa;
-		for (const [state, pos] of this.state.positions) {
+		for (const state of nfa.states) {
 			states.push(<g
 				key={state}
-				transform={"translate(" + pos.x + ", " + pos.y + ")"}
+				transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
 				onMouseDown={(e) => {this.startDragging(e, state)}}
 				className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.accept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}
 				draggable={false}
@@ -393,21 +399,36 @@ class VisualEditor extends Component {
 				/>
 				<foreignObject
 					x={-0.5 * this.STATE_RADIUS}
+					y={-0.8 * this.STATE_RADIUS}
+					width={this.STATE_RADIUS}
+					height={this.STATE_RADIUS}
+				>
+					<i
+						className={"fa fa-flag-checkered" + (!nfa.isStart(state) ? " btn-edit-state" : "")}
+						title={!nfa.isStart(state) ? "Set as start" : null}
+						onClick={() => {if (!nfa.isStart(state)) this.props.setStart(state); }}
+					></i>
+				</foreignObject>
+				<foreignObject
+					x={-0.5 * this.STATE_RADIUS}
 					y={0.4 * this.STATE_RADIUS}
 					width={this.STATE_RADIUS}
 					height={this.STATE_RADIUS}
 				>
 					<i
 						className="fa fa-pencil btn-edit-state"
+						title="Edit name"
 						onClick={() => this.props.promptEditState(state)}
 					></i>
 					<i
-						className="fa fa-check btn-edit-state"
-						onClick={() => this.props.toggleAccept(state)}
+						className="fa fa-remove btn-edit-state"
+						title="Delete"
+						onClick={() => this.props.confirmRemoveState(state)}
 					></i>
 					<i
-						className="fa fa-remove btn-edit-state"
-						onClick={() => this.props.confirmRemoveState(state)}
+						className="fa fa-check btn-edit-state"
+						title={nfa.accept(state) ? "Remove accept state" : "Make accept state"}
+						onClick={() => this.props.toggleAccept(state)}
 					></i>
 				</foreignObject>
 				<text

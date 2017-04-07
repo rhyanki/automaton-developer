@@ -1,4 +1,5 @@
-import {copy, freeze} from '../Util/immutability.js';
+//import {freeze} from '../Util/immutability.js';
+import {Map, Set} from 'immutable';
 import SymbolGroup from './SymbolGroup.js';
 
 /**
@@ -42,7 +43,7 @@ import SymbolGroup from './SymbolGroup.js';
  * on which they are called, and return it.
  * Otherwise, they will create a minimal copy (maintaining as many references as possible) and return
  * the copy.
- * If not mutable, it is possible to do things like compare oldNFA.states() === newNFA.states() to see if any states have been added or removed.
+ * If not mutable, it is possible to do things like compare oldNFA.states === newNFA.states to see if any states have been added or removed.
  */
 class NFA {
 	constructor(template) {
@@ -51,7 +52,7 @@ class NFA {
 			for (var k in template) {
 				this[k] = template[k];
 			}
-			this._frozen = undefined;
+			this._mutable = true;
 			return this;
 		}
 
@@ -60,10 +61,10 @@ class NFA {
 		};
 
 		this._start = 0;
-		this._states = new Set();
-		this._names = new Map();
-		this._accept = new Set();
-		this._transitions = new Map();
+		this._states = Set().asMutable();
+		this._names = Map().asMutable();
+		this._accept = Set().asMutable();
+		this._transitions = Map().asMutable();
 
 		// Parse input states
 		if (template.states instanceof Array) {
@@ -74,7 +75,7 @@ class NFA {
 				if (template.states[i].accept) {
 					this._accept.add(state);
 				}
-				this._transitions.set(state, new Map(template.states[i].transitions));
+				this._transitions.set(state, Map().asMutable().merge(template.states[i].transitions));
 				this._shared.nextID++;
 			}
 		}
@@ -93,10 +94,10 @@ class NFA {
 		this._calculateWhetherDFA();
 
 		// Mutable by default
-		if (template.mutable === undefined || template.mutable) {
-			this._mutable = true;
-		} else {
+		if (template.mutable !== undefined && !template.mutable) {
 			this.immutable();
+		} else {
+			this._mutable = true;
 		}
 	}
 
@@ -105,14 +106,14 @@ class NFA {
 	 * and add them to this._generating
 	*/
 	_calculateGenerating() {
-		this._generating = new Set();
+		this._generating = Set().asMutable();
 
-		for (const state of this.acceptStates()) {
+		for (const state of this.acceptStates) {
 			this._explore(state, this._generating, true);
 		}
 
 		// This should never be mutated
-		freeze(this._generating);
+		this._generating.asImmutable();
 	}
 
 	/**
@@ -120,14 +121,12 @@ class NFA {
 	 * and add them to this._reachable
 	 */
 	_calculateReachable() {
-		this._reachable = new Set();
-		if (!this._start) {
-			return;
+		this._reachable = Set().asMutable();
+		if (this._start) {
+			this._explore(this._start, this._reachable);
 		}
-		this._explore(this._start, this._reachable);
-
 		// This should never be mutated
-		freeze(this._reachable);
+		this._reachable.asImmutable();
 	}
 
 	/**
@@ -136,7 +135,7 @@ class NFA {
 	 */
 	_calculateWhetherDFA() {
 		// For each state, check whether any of its transition symbol groups intersect
-		for (const [, transitions] of this.transitions()) {
+		for (const [, transitions] of this.transitions) {
 			if (SymbolGroup.intersect(transitions.values())) {
 				this._dfa = false;
 				return;
@@ -159,7 +158,7 @@ class NFA {
 		}
 		visited.add(state);
 		if (backwards) {
-			for (const origin of this.states()) {
+			for (const origin of this.states) {
 				if (this.hasTransition(origin, state)) {
 					this._explore(origin, visited, backwards);
 				}
@@ -173,10 +172,33 @@ class NFA {
 	}
 
 	/**
-	 * Return the number of states in the NFA.
+	 * Get the accept states.
+	 * @returns {Set<Number>} The set of accept states.
+	 */
+	get acceptStates() {
+		return this._accept;
+	}
+
+	/**
+	 * Get the number of states in the NFA.
+	 * @returns {Number}
 	 */
 	get numStates() {
 		return this._states.size;
+	}
+
+	/**
+	 * @returns {Set<Number>} Set of the NFA's states.
+	 */
+	get states() {
+		return this._states;
+	}
+
+	/**
+	 * @returns {Map<Number, Map>} Map of the NFA's transitions, of the form Map<origin: Number, Map<target: Number, symbols: SymbolGroup>.
+	 */
+	get transitions() {
+		return this._transitions;
 	}
 
 	/**
@@ -186,14 +208,6 @@ class NFA {
 	 */
 	accept(state) {
 		return this._accept.has(this.state(state));
-	}
-
-	/**
-	 * Get the accept states.
-	 * @returns {Set<Number>} The set of accept states.
-	 */
-	acceptStates() {
-		return this._accept;
 	}
 
 	/**
@@ -210,38 +224,19 @@ class NFA {
 		const id = this._shared.nextID;
 		this._shared.nextID++;
 
-		let nfa = this;
+		const nfa = this.mutable();
 
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._states = copy(nfa._states);
-			nfa._names = copy(nfa._names);
-			nfa._transitions = copy(nfa._transitions);
-		}
-
-		nfa._states.add(id);
-		nfa._names.set(id, name);
-		nfa._transitions.set(id, new Map());
+		nfa._states = nfa._states.asMutable().add(id);
+		nfa._names = nfa._names.asMutable().set(id, name);
+		nfa._transitions = nfa._transitions.asMutable().set(id, Map());
 
 		// Note that the new state is trivially neither reachable nor generating, so no need to recalculate those.
 
 		if (!this._mutable) {
-			freeze(nfa._transitions);
-			freeze(nfa._names);
-			freeze(nfa._states);
-			freeze(nfa);
+			nfa.immutable();
 		}
 
 		return nfa;
-	}
-
-	/**
-	 * Return a shallow copy of this NFA.
-	 * It will be (shallowly) mutable, so it can have elements replaced if need be (any previously immutable elements will remain so).
-	 * Afterwards it must be made immutable again.
-	 */
-	copy() {
-		return new NFA(this);
 	}
 
 	/**
@@ -262,7 +257,7 @@ class NFA {
 	hasTransition(origin, target) {
 		origin = this.state(origin);
 		target = this.state(target);
-		if (!origin || !target) {
+		if (!origin || !target || !this._transitions.has(origin)) {
 			return;
 		}
 		return this._transitions.get(origin).has(target);
@@ -270,17 +265,22 @@ class NFA {
 
 	/**
 	 * Make this NFA (deeply) immutable, preventing any further changes from ever being made to it or its constituents.
+	 * @returns {NFA}
 	 */
 	immutable() {
+		if (!this._mutable) {
+			return this;
+		}
 		this._mutable = false;
 		for (const transitions of this._transitions.values()) {
-			freeze(transitions);
+			transitions.asImmutable();
 		}
-		freeze(this._accept);
-		freeze(this._states);
-		freeze(this._names);
-		freeze(this._transitions);
-		freeze(this);
+		this._accept.asImmutable();
+		this._states.asImmutable();
+		this._names.asImmutable();
+		this._transitions.asImmutable();
+		Object.freeze(this);
+		return this;
 	}
 
 	/**
@@ -289,6 +289,28 @@ class NFA {
 	 */
 	isDFA() {
 		return this._dfa;
+	}
+
+	/**
+	 * Check whether a state is the start state.
+	 * @param {Number} [state] The state to check.
+	 * @returns {Number} Whether the arg is the start state.
+	 */
+	isStart(state) {
+		state = this.state(state);
+		return state && this._start === state;
+	}
+
+	/**
+	 * Return a shallow, mutable copy of this NFA (or itself it is already mutable).
+	 * It will be mutable, so it can have elements replaced if need be (but any previously immutable elements will remain so).
+	 * @returns {NFA}
+	 */
+	mutable() {
+		if (this._mutable) {
+			return this;
+		}
+		return new NFA(this);
 	}
 
 	/**
@@ -310,7 +332,7 @@ class NFA {
 	}
 
 	/**
-	 * Remove a state.
+	 * Remove a state (and all associated transitions).
 	 * @param {Number} state
 	 * @returns {NFA}
 	 */
@@ -321,18 +343,17 @@ class NFA {
 			return this;
 		}
 
-		let nfa = this;
+		const nfa = this.mutable();
 
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._states = copy(nfa._states);
-			nfa._transitions = copy(nfa._transitions);
-			transitions = copy(transitions);
-			nfa._transitions.set(origin, transitions);
+		// Delete all transitions from the state
+		nfa._transitions = nfa._transitions.asMutable().delete(state);
+
+		// Delete all transitions to the state
+		for (const origin of nfa._transitions.keys()) {
+			console.log("Removing transition from " + origin + " to " + state);
+			nfa.removeTransition(origin, state);
 		}
-
-		// Delete the transition
-		transitions.delete(target);
+		nfa._states = nfa._states.asMutable().delete(state);
 
 		nfa._calculateGenerating();
 		nfa._calculateReachable();
@@ -342,9 +363,7 @@ class NFA {
 		}
 
 		if (!this._mutable) {
-			freeze(transitions);
-			freeze(nfa._transitions);
-			freeze(nfa);
+			nfa.immutable();
 		}
 		return nfa;
 	}
@@ -359,21 +378,13 @@ class NFA {
 		origin = this.state(origin);
 		target = this.state(target);
 
-		if (!origin || !target) {
+		if (!this.hasTransition(origin, target)) {
 			return this;
 		}
 
-		let nfa = this;
-		let transitions = nfa._transitions.get(origin); // Map of transitions from the origin
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._transitions = copy(nfa._transitions);
-			transitions = copy(transitions);
-			nfa._transitions.set(origin, transitions);
-		}
-
-		// Delete the transition
-		transitions.delete(target);
+		const nfa = this.mutable();
+		const transitions = nfa._transitions.get(origin).asMutable();
+		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.delete(target));
 
 		nfa._calculateGenerating();
 		nfa._calculateReachable();
@@ -383,9 +394,7 @@ class NFA {
 		}
 
 		if (!this._mutable) {
-			freeze(transitions);
-			freeze(nfa._transitions);
-			freeze(nfa);
+			nfa.immutable();
 		}
 		return nfa;
 	}
@@ -416,18 +425,16 @@ class NFA {
 	 */
 	setStart(state) {
 		state = this.state(state);
-		if (this.start(state)) {
+		if (this.isStart(state)) {
 			return this;
 		}
-		let nfa = this;
-		if (!this._mutable) {
-			nfa = nfa.copy();
-		}
+
+		const nfa = this.mutable();
 		nfa._start = state;
 		nfa._calculateReachable();
 
 		if (!this._mutable) {
-			freeze(nfa);
+			nfa.immutable();
 		}
 		return nfa;
 	}
@@ -446,23 +453,20 @@ class NFA {
 			return this;
 		}
 
-		let nfa = this;
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._accept = copy(nfa._accept);
-		}
+		const nfa = this.mutable();
 
+		nfa._accept = nfa._accept.asMutable();
 		if (accept) {
-			nfa._accept.add(state);
+			nfa._accept = nfa._accept.add(state);
 		} else {
-			nfa._accept.delete(state);
+			nfa._accept = nfa._accept.delete(state);
 		}
 
 		nfa._calculateGenerating();
 
 		if (!this._mutable) {
-			freeze(nfa._accept);
-			freeze(nfa);
+			console.log("Making immutable again");
+			nfa.immutable();
 		}
 
 		return nfa;
@@ -480,30 +484,24 @@ class NFA {
 			return this;
 		}
 
-		var nfa = this;
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._names = copy(nfa._names);
-		}
-
-		nfa._names.set(state, name);
+		const nfa = this.mutable();
+		nfa._names = nfa._names.asMutable().set(state, name);
 
 		if (!this._mutable) {
-			freeze(nfa._names);
-			freeze(nfa);
+			nfa.immutable();
 		}
 
 		return nfa;
 	}
 
 	/**
-	 * Set the symbols of a transition.
+	 * Set the symbols of a transition (creating the transition if it does not exist).
 	 * @param {Number} id ID of the origin state.
 	 * @param {Number} target ID of the target state.
 	 * @param {String|SymbolGroup} symbols The new symbol group.
 	 * @returns {NFA} The new NFA.
 	 */
-	setTransitionSymbols(origin, target, symbols) {
+	setTransition(origin, target, symbols) {
 		origin = this.state(origin);
 		target = this.state(target);
 
@@ -512,29 +510,21 @@ class NFA {
 		}
 
 		symbols = new SymbolGroup(symbols);
+		console.log(symbols);
 		if (symbols.equals(this.symbols(origin, target))) {
 			return this;
 		}
 
-		let nfa = this;
-		let transitions = nfa._transitions.get(origin);
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._transitions = copy(nfa._transitions);
-			transitions = copy(transitions);
-			nfa._transitions.set(origin, transitions);
-		}
-
+		const nfa = this.mutable();
+		const transitions = nfa._transitions.get(origin).asMutable();
 		// Update the transition
-		transitions.set(target, symbols);
+		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.set(target, symbols));
 
 		// Note that the graph structure itself is unchanged, so no need to recalculate generating or reachable.
 		nfa._calculateWhetherDFA();
 
 		if (!this._mutable) {
-			freeze(transitions);
-			freeze(nfa._transitions);
-			freeze(nfa);
+			nfa.immutable();
 		}
 		return nfa;
 	}
@@ -554,18 +544,12 @@ class NFA {
 		if (!origin || !oldTarget || !newTarget || oldTarget === newTarget || !this.hasTransition(origin, oldTarget)) {
 			return this;
 		}
-		let nfa = this;
-		let transitions = nfa._transitions.get(origin);
-		if (!this._mutable) {
-			nfa = nfa.copy();
-			nfa._transitions = copy(nfa._transitions);
-			transitions = copy(transitions);
-			nfa._transitions.set(origin, transitions);
-		}
 
-		const newSymbols = transitions.get(oldTarget).merge(transitions.get(newTarget));
-		transitions.delete(oldTarget);
-		transitions.set(newTarget, newSymbols);
+		const nfa = this.mutable();
+
+		const newSymbols = this.symbols(origin, oldTarget).merge(this.symbols(origin, newTarget));
+		nfa.removeTransition(origin, oldTarget);
+		nfa.setTransition(origin, newTarget, newSymbols);
 
 		nfa._calculateReachable();
 		nfa._calculateGenerating();
@@ -575,25 +559,9 @@ class NFA {
 		}
 
 		if (!this._mutable) {
-			freeze(transitions);
-			freeze(nfa._transitions);
-			freeze(nfa);
+			nfa.immutable();
 		}
 		return nfa;
-	}
-
-	/**
-	 * Return the start state, or whether a state is the start state.
-	 * @param {Number} [state] The state to check.
-	 * @returns {Number|Boolean} Whether the arg is the start state, or the start state ID if no arg.
-	 */
-	start(state) {
-		if (state === undefined) {
-			return this._start;
-		} else {
-			state = this.state(state);
-			return state && this._start === state;
-		}
 	}
 
 	/**
@@ -610,13 +578,6 @@ class NFA {
 	}
 
 	/**
-	 * @returns {Set<Number>} Set of the NFA's states.
-	 */
-	states() {
-		return this._states;
-	}
-
-	/**
 	 * Return the symbols of a transition from one state to another.
 	 * @param {Number} origin The origin state ID.
 	 * @param {Number} target The target state ID.
@@ -625,7 +586,7 @@ class NFA {
 	symbols(origin, target) {
 		origin = this.state(origin);
 		target = this.state(target);
-		if (!origin || !target) {
+		if (!this.hasTransition(origin, target)) {
 			return;
 		}
 		return this._transitions.get(origin).get(target);
@@ -641,17 +602,14 @@ class NFA {
 	}
 
 	/**
-	 * Get the potential transitions from a given state, or all transitions if not provided.
-	 * @param {Number} [origin] The origin state ID.
-	 * @returns {Map<Number, SymbolGroup>|Map<Number, Map>} An map of the form [target : Number, symbols : SymbolGroup] if origin given, otherwise [origin : Number, transitions : Map<Number, SymbolGroup>]. Empty map if origin invalid.
+	 * Get the potential transitions from a given state.
+	 * @param {Number} origin The origin state ID.
+	 * @returns {Map<Number, SymbolGroup>|Map<Number, Map>} An map of the form [target : Number, symbols : SymbolGroup].
 	 */
-	transitions(origin) {
-		if (origin === undefined) {
-			return this._transitions;
-		}
+	transitionsFrom(origin) {
 		origin = this.state(origin);
 		if (!origin) {
-			return new Map();
+			return Map();
 		}
 		return this._transitions.get(origin);
 	}

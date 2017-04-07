@@ -21,7 +21,14 @@ function copy(item) {
 
 /**
  * Make an array, plain object, Set or Map (shallowly) immutable.
- * Sets and Maps have their methods overridden to return copies of themselves instead.
+ * Sets and Maps have their methods overridden to return mutable copies of themselves
+ * instead if they would be modified.
+ * For example:
+ * x = new Map([1, 1]);
+ * y = x.set(1, 1); // x === y
+ * y = x.set(1, 2); // x !== y
+ * z = y.set(1, 3); // y === z
+ *
  * Return the same item.
  */
 function freeze(item) {
@@ -29,31 +36,71 @@ function freeze(item) {
 		return item;
 	}
 	if (item instanceof Map) {
-		item.set = Map_set;
-		item.clear =
-		item.set = item.clear = item.delete = function() {
-			throw new Error("Cannot modify frozen Map.");
-		}
+		item.set = immutable_map_set;
+		item.clear = immutable_map_clear;
+		item.delete = immutable_map_delete;
 	} else if (item instanceof Set) {
-		item.add = item.clear = item.delete = function() {
-			throw new Error("Cannot modify frozen Set.");
-		}
+		item.add = immutable_set_add;
+		item.clear = immutable_set_clear;
+		item.delete = immutable_set_delete;
 	}
 	item._frozen = true;
 	return Object.freeze(item);
 }
 
-function Map_set(...args) {
+function immutable_map_set(key, value) {
 	console.log("set() called on frozen Map");
-	const setCopy = copy(this);
-	setCopy.set(...args);
+	if (this.get(key) === value) {
+		return this;
+	}
+	const mapCopy = new Map(this);
+	mapCopy.set(key, value);
+	return mapCopy;
+}
+
+function immutable_map_clear() {
+	console.log("clear() called on frozen Map");
+	if (this.size === 0) {
+		return this;
+	}
+	return new Map();
+}
+
+function immutable_map_delete(key) {
+	console.log("delete() called on frozen Map");
+	if (!this.has(key)) {
+		return this;
+	}
+	const mapCopy = new Map(this);
+	mapCopy.delete(key);
+	return mapCopy;
+}
+
+function immutable_set_add(item) {
+	console.log("add() called on frozen Set");
+	if (this.has(item)) {
+		return this;
+	}
+	const setCopy = new Set(this);
+	setCopy.add(item);
 	return setCopy;
 }
 
-function Map_clear(...args) {
-	console.log("clear() called on frozen Map");
-	const setCopy = copy(this);
-	setCopy.clear(...args);
+function immutable_set_clear() {
+	console.log("clear() called on frozen Set");
+	if (this.size === 0) {
+		return this;
+	}
+	return new Set();
+}
+
+function immutable_set_delete(item) {
+	console.log("delete() called on frozen Set");
+	if (!this.has(item)) {
+		return this;
+	}
+	const setCopy = new Set(this);
+	setCopy.delete(item);
 	return setCopy;
 }
 

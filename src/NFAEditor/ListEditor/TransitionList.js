@@ -6,10 +6,10 @@ class TransitionList extends Component {
 		let rows = [];
 		const nfa = this.props.nfa;
 		const state = this.props.state;
-		const sortedTransitions = [...nfa.transitions(state)].sort((a, b) => a[0] - b[0]);
+		const sortedTransitions = [...nfa.transitionsFrom(state)].sort((a, b) => a[0] - b[0]);
 		for (const [target, symbols] of sortedTransitions) {
 			let opts = [];
-			for (const opt of nfa.states()) {
+			for (const opt of nfa.states) {
 				opts.push(
 					<option key={opt} value={opt}>{nfa.name(opt)}</option>
 				);

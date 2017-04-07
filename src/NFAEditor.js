@@ -60,11 +60,11 @@ class NFAEditor extends Component {
 		this.handle('toggleAccept', ...arguments);
 	}
 
-	handleUpdateStart(state) {
+	handleSetStart(state) {
 		this.handle('setStart', ...arguments);
 	}
 
-	handleUpdateStateName(state, name) {
+	handleSetName(state, name) {
 		this.handle('setName', ...arguments);
 	}
 
@@ -102,8 +102,8 @@ class NFAEditor extends Component {
 					<ListEditor
 						nfa={this.state.nfa}
 						handleToggleAccept={this.handleToggleAccept}
-						handleUpdateStart={this.handleUpdateStart}
-						handleUpdateStateName={this.handleUpdateStateName}
+						handleSetStart={this.handleSetStart}
+						handleSetName={this.handleSetName}
 						handleUpdateTransitionTarget={this.handleUpdateTransitionTarget}
 						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 					/>
@@ -113,7 +113,7 @@ class NFAEditor extends Component {
 						nfa={this.state.nfa}
 						handleAddState={this.handleAddState}
 						handleToggleAccept={this.handleToggleAccept}
-						handleUpdateStateName={this.handleUpdateStateName}
+						handleSetName={this.handleSetName}
 						confirmRemoveTransition={this.confirmRemoveTransition}
 						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 					/>

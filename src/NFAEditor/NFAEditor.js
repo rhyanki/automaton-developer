@@ -76,7 +76,7 @@ class NFAEditor extends Component {
 	promptEditState(state) {
 		const newName = window.prompt("Enter a state name.", this.props.nfa.name(state));
 		if (newName) {
-			this.updateStateName(state, newName);
+			this.setName(state, newName);
 		}
 	}
 
@@ -85,7 +85,7 @@ class NFAEditor extends Component {
 		if (symbols === null) {
 			return;
 		}
-		this.handle('setTransitionSymbols', origin, target, symbols);
+		this.handle('setTransition', origin, target, symbols);
 	}
 
 	switchEditor(editor) {
@@ -97,11 +97,11 @@ class NFAEditor extends Component {
 		this.handle('toggleAccept', ...arguments);
 	}
 
-	updateStart(state) {
+	setStart(state) {
 		this.handle('setStart', ...arguments);
 	}
 
-	updateStateName(state, name) {
+	setName(state, name) {
 		this.handle('setName', ...arguments);
 	}
 
@@ -129,15 +129,17 @@ class NFAEditor extends Component {
 					className="btn btn-default"
 					disabled={nfa.isDFA()}
 				>{nfa.isDFA() ? "Already a DFA" : "Convert to DFA"}</button>
+				<br/><br/>
+				<button className="btn btn-default" onClick={() => console.log(this.state.nfa)}>Log NFA to console</button>
 			</div>
 			<div className="col-md-8">
 				<div style={{display: (this.state.editor === 'list') ? 'block' : 'none'}}>
 					<ListEditor
 						nfa={this.state.nfa}
 						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
+						setStart={this.setStart}
+						setName={this.setName}
 						toggleAccept={this.toggleAccept}
-						updateStart={this.updateStart}
-						updateStateName={this.updateStateName}
 						updateTransitionTarget={this.updateTransitionTarget}
 					/>
 				</div>
@@ -148,6 +150,7 @@ class NFAEditor extends Component {
 						confirmRemoveTransition={this.confirmRemoveTransition}
 						promptEditState={this.promptEditState}
 						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
+						setStart={this.setStart}
 						toggleAccept={this.toggleAccept}
 					/>
 				</div>
