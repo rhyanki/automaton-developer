@@ -1,9 +1,9 @@
 import React, { Component } from 'react';
-import {copy, freeze} from '../util.js';
+import {copy, freeze} from '../../Util/immutability.js';
 import TransitionList from './TransitionList.js';
-import './StateList.css';
+import './ListEditor.css';
 
-class StateList extends Component {
+class ListEditor extends Component {
 	constructor(props) {
 		super(props);
 
@@ -11,7 +11,7 @@ class StateList extends Component {
 		this.handleMoveStateUp = this.handleMoveStateUp.bind(this);
 
 		this.state = {
-			order: [...this.props.dfa.states()]
+			order: [...this.props.nfa.states()]
 		}
 		freeze(this.state.order);
 	}
@@ -43,23 +43,23 @@ class StateList extends Component {
 	}
 
 	render() {
-		const dfa = this.props.dfa;
+		const nfa = this.props.nfa;
 		const rows = this.state.order.map((state) => {
-			return <tr key={state} className={'state ' + (!dfa.reachable(state) ? 'state-unreachable ' : '') + (dfa.accept(state) ? 'state-accept ' : '') + (!dfa.generating(state) ? 'state-nongenerating ' : '')}>
+			return <tr key={state} className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.accept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}>
 				<td>
 					<button onClick={() => this.handleMoveStateUp(state)}><i className="fa fa-chevron-up"></i></button>
 					<button onClick={() => this.handleMoveStateDown(state)}><i className="fa fa-chevron-down"></i></button>
 				</td>
-				<td><input name="start" type="radio" onChange={() => this.props.handleUpdateStart(state)} checked={dfa.start(state)} /></td>
+				<td><input name="start" type="radio" onChange={() => this.props.handleUpdateStart(state)} checked={nfa.start(state)} /></td>
 				<td>{state}</td>
-				<td><input type="text" className="form-control" value={dfa.name(state)} onChange={(e) => this.props.handleUpdateStateName(state, e.target.value)} /></td>
+				<td><input type="text" className="form-control" value={nfa.name(state)} onChange={(e) => this.props.handleUpdateStateName(state, e.target.value)} /></td>
 				<td>
-					<TransitionList dfa={dfa} state={state}
+					<TransitionList nfa={nfa} state={state}
 					handleUpdateTransitionTarget={this.props.handleUpdateTransitionTarget}
 					promptUpdateTransitionSymbols={this.props.promptUpdateTransitionSymbols} />
 				</td>
 				<td>
-					<input type="checkbox" onChange={(e) => this.props.handleUpdateAccept(state, e.target.checked)} checked={dfa.accept(state)} />
+					<input type="checkbox" onChange={(e) => this.props.handleUpdateAccept(state, e.target.checked)} checked={nfa.accept(state)} />
 				</td>
 			</tr>;
 		});
@@ -92,4 +92,4 @@ class StateList extends Component {
 	}
 }
 
-export default StateList;
+export default ListEditor;

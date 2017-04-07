@@ -4,14 +4,14 @@ import './TransitionList.css';
 class TransitionList extends Component {
 	render() {
 		let rows = [];
-		const dfa = this.props.dfa;
+		const nfa = this.props.nfa;
 		const state = this.props.state;
-		const sortedTransitions = [...dfa.transitions(state)].sort((a, b) => a[0] - b[0]);
+		const sortedTransitions = [...nfa.transitions(state)].sort((a, b) => a[0] - b[0]);
 		for (const [target, symbols] of sortedTransitions) {
 			let opts = [];
-			for (const opt of dfa.states()) {
+			for (const opt of nfa.states()) {
 				opts.push(
-					<option key={opt} value={opt}>{dfa.name(opt)}</option>
+					<option key={opt} value={opt}>{nfa.name(opt)}</option>
 				);
 			}
 			rows.push(<tr key={target} className="transition-row">

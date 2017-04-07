@@ -1,13 +1,13 @@
 import React, { Component } from 'react';
 import StateList from './StateList/StateList.js';
 import VisualEditor from './VisualEditor/VisualEditor.js';
-import './DFAEditor.css';
+import './NFAEditor.css';
 
-class DFAEditor extends Component {
+class NFAEditor extends Component {
 	constructor(props) {
 		super(props);
 		this.state = {
-			dfa: this.props.dfa
+			nfa: this.props.nfa
 		}
 
 		// Bind all methods to this
@@ -19,31 +19,31 @@ class DFAEditor extends Component {
 	}
 
 	componentDidUpdate() {
-		console.log("DFAEditor updated.");
+		console.log("NFAEditor updated.");
 	}
 
 	shouldComponentUpdate(nextProps, nextState) {
-		// Component only needs to update if the DFA changed
-		if (this.state.dfa !== nextState.dfa) {
+		// Component only needs to update if the NFA changed
+		if (this.state.nfa !== nextState.nfa) {
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Update the DFAEditor's state with a new DFA, based on the result of calling one of the DFA's methods.
-	 * @param {String} methodName The name of the DFA method to call.
-	 * @param {*} args The args to pass to the DFA method call.
+	 * Update the NFAEditor's state with a new NFA, based on the result of calling one of the NFA's methods.
+	 * @param {String} methodName The name of the NFA method to call.
+	 * @param {*} args The args to pass to the NFA method call.
 	 */
 	handle(methodName, args) {
 		this.setState((prevState, props) => {
-			if (!(prevState.dfa[methodName] instanceof Function)) {
-				console.log(methodName + " is not a valid DFA method!");
-				throw new Error(methodName + " is not a valid DFA method!");
+			if (!(prevState.nfa[methodName] instanceof Function)) {
+				console.log(methodName + " is not a valid NFA method!");
+				throw new Error(methodName + " is not a valid NFA method!");
 			}
 			try {
 				return {
-					dfa: prevState.dfa[methodName](...([...arguments].slice(1)))
+					nfa: prevState.nfa[methodName](...([...arguments].slice(1)))
 				};
 			} catch (e) {
 				window.alert(e.message);
@@ -69,7 +69,7 @@ class DFAEditor extends Component {
 	}
 
 	handleUpdateTransitionTarget(origin, oldTarget, newTarget) {
-		if (this.state.dfa.hasTransition(origin, newTarget)) {
+		if (this.state.nfa.hasTransition(origin, newTarget)) {
 			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions. Do you wish to continue?")) {
 				return;
 			}
@@ -85,7 +85,7 @@ class DFAEditor extends Component {
 	}
 
 	promptUpdateTransitionSymbols(origin, target) {
-		const symbols = window.prompt("Enter a new symbol or symbols.", this.state.dfa.symbols(origin, target));
+		const symbols = window.prompt("Enter a new symbol or symbols.", this.state.nfa.symbols(origin, target));
 		if (symbols === null) {
 			return;
 		}
@@ -95,25 +95,32 @@ class DFAEditor extends Component {
 	render() {
 		return (<div className="row">
 			<div className="col-md-6">
-				<StateList dfa={this.state.dfa}
-				handleToggleAccept={this.handleToggleAccept}
-				handleUpdateStart={this.handleUpdateStart}
-				handleUpdateStateName={this.handleUpdateStateName}
-				handleUpdateTransitionTarget={this.handleUpdateTransitionTarget}
-				promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
-				/>
+
 			</div>
 			<div className="col-md-6">
-				<VisualEditor dfa={this.state.dfa}
-				handleAddState={this.handleAddState}
-				handleToggleAccept={this.handleToggleAccept}
-				handleUpdateStateName={this.handleUpdateStateName}
-				promptRemoveTransition={this.promptRemoveTransition}
-				promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
-				/>
+				<div style={{display: (this.state.editor === 'list') ? 'block' : 'none'}}>
+					<ListEditor
+						nfa={this.state.nfa}
+						handleToggleAccept={this.handleToggleAccept}
+						handleUpdateStart={this.handleUpdateStart}
+						handleUpdateStateName={this.handleUpdateStateName}
+						handleUpdateTransitionTarget={this.handleUpdateTransitionTarget}
+						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
+					/>
+				</div>
+				<div style={{display: (this.state.mode === 'visual') ? 'block' : 'none'}}>
+					<VisualEditor
+						nfa={this.state.nfa}
+						handleAddState={this.handleAddState}
+						handleToggleAccept={this.handleToggleAccept}
+						handleUpdateStateName={this.handleUpdateStateName}
+						promptRemoveTransition={this.promptRemoveTransition}
+						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
+					/>
+				</div>
 			</div>
 		</div>);
 	}
 }
 
-export default DFAEditor;
+export default NFAEditor;

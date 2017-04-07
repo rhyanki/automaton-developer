@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
-import Vector from './Vector.js';
-import {copy} from '../util.js';
+import Vector from '../../Util/Vector.js';
+import {copy} from '../../Util/immutability.js';
 import './VisualEditor.css';
 
 class VisualEditor extends Component {
@@ -31,11 +31,11 @@ class VisualEditor extends Component {
 	}
 
 	componentWillReceiveProps(nextProps) {
-		if (this.props.dfa.states() === nextProps.dfa.states()) {
+		if (this.props.nfa.states() === nextProps.nfa.states()) {
 			return;
 		}
 		// Check if any states have been added
-		for (const state of nextProps.dfa.states()) {
+		for (const state of nextProps.nfa.states()) {
 			if (!this.state.positions.has(state)) {
 				// Put them in the center of the editor by default
 				this.setState((prevState, prevProps) => {
@@ -50,8 +50,8 @@ class VisualEditor extends Component {
 	}
 
 	shouldComponentUpdate(nextProps, nextState) {
-		// Component only needs to update if the DFA or positions changed
-		if (this.props.dfa !== nextProps.dfa) {
+		// Component only needs to update if the NFA or positions changed
+		if (this.props.nfa !== nextProps.nfa) {
 			return true;
 		}
 		if (this.state.positions !== nextState.positions) {
@@ -126,7 +126,7 @@ class VisualEditor extends Component {
 		if (this.state.dragging) {
 			return;
 		}
-		const newName = window.prompt("Enter a state name.", this.props.dfa.name(state));
+		const newName = window.prompt("Enter a state name.", this.props.nfa.name(state));
 		if (newName) {
 			this.props.handleUpdateStateName(state, newName);
 		}
@@ -154,13 +154,13 @@ class VisualEditor extends Component {
 	resetPositions() {
 		this.setState((state, props) => {
 			const positions = new Map(); // Stores the positions of each state
-			const numStates = props.dfa.numStates;
+			const numStates = props.nfa.numStates;
 
 			let angle = Math.PI; // The angle at which the next state should be placed
 			const offset = Math.min(this.width, this.height) * 0.3; // The distance each state should start from the centre
 			const direction = -1; // -1 for clockwise, 1 for anticlockwise
 
-			for (const state of props.dfa.states()) {
+			for (const state of props.nfa.states()) {
 				const x = Math.round(this.width * 0.5 + Math.cos(angle) * offset);
 				const y = Math.round(this.height * 0.5 - Math.sin(angle) * offset);
 				positions.set(state, new Vector(x, y));
@@ -220,7 +220,7 @@ class VisualEditor extends Component {
 	 * @returns {React.Element[]}
 	 */
 	renderTransitions() {
-		const dfa = this.props.dfa;
+		const nfa = this.props.nfa;
 		const output = [];
 		const angles = new Map(); // List of angles around the state's circle at which each transition arrow leaves
 
@@ -232,7 +232,7 @@ class VisualEditor extends Component {
 		};
 
 		for (const [origin, originPos] of this.state.positions) {
-			for (const [target, symbols] of dfa.transitions(origin)) {
+			for (const [target, symbols] of nfa.transitions(origin)) {
 				if (origin === target) {
 					// Will need to make special case for self-connections
 					continue;
@@ -252,7 +252,7 @@ class VisualEditor extends Component {
 				let symbolsPos;
 
 				// If there is a two-way connection, draw curved lines
-				if (dfa.hasTransition(target, origin)) {
+				if (nfa.hasTransition(target, origin)) {
 					control = this.controlPoint(originPos, targetPos, 30);
 					d += " Q " + control.x + " " + control.y + ", " + targetPos.x + " " + targetPos.y;
 					symbolsPos = this.controlPoint(originPos, targetPos, 25);
@@ -267,13 +267,13 @@ class VisualEditor extends Component {
 				const targetIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, 1 - this.STATE_RADIUS / dist);
 				const arrowHead = this.renderArrowHead(targetIntersectPos, angle, ARROW_HEAD_SIZE, ARROW_HEAD_ANGLE);
 
-				if (dfa.hasTransition(target, target)) {
+				if (nfa.hasTransition(target, target)) {
 					angles.get(target).push(targetPos.angleTo(targetIntersectPos));
 				}
 
 				// Push the angle around the state circle from which the transition arrow protrudes
 				const originIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, this.STATE_RADIUS / dist);
-				if (dfa.hasTransition(origin, origin)) {
+				if (nfa.hasTransition(origin, origin)) {
 					angles.get(origin).push(originPos.angleTo(originIntersectPos));
 				}
 
@@ -304,7 +304,7 @@ class VisualEditor extends Component {
 		}
 
 		for (const state of this.state.positions.keys()) {
-			if (dfa.hasTransition(state, state)) {
+			if (nfa.hasTransition(state, state)) {
 				const pos = this.pos(state);
 				let angs = angles.get(state);
 
@@ -338,7 +338,7 @@ class VisualEditor extends Component {
 				const end = pos.plus(new Vector(this.STATE_RADIUS, aEnd, true));
 
 				let d = "M" + start.x + " " + start.y + " A " + r + " " + r + " 0 1 1 " + end.x + " " + end.y;
-				const symbols = dfa.symbols(state, state);
+				const symbols = nfa.symbols(state, state);
 				const symbolsPos = pos.plus(new Vector(this.STATE_RADIUS + r * 2.1, angle, true));
 
 				let textAnchor;
@@ -386,13 +386,13 @@ class VisualEditor extends Component {
 
 	render() {
 		const states = [];
-		const dfa = this.props.dfa;
+		const nfa = this.props.nfa;
 		for (const [state, pos] of this.state.positions) {
 			states.push(<g
 				key={state}
 				transform={"translate(" + pos.x + ", " + pos.y + ")"}
 				onMouseDown={(e) => {this.startDragging(e, state)}}
-				className={'state ' + (!dfa.reachable(state) ? 'state-unreachable ' : '') + (dfa.accept(state) ? 'state-accept ' : '') + (!dfa.generating(state) ? 'state-nongenerating ' : '')}
+				className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.accept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}
 				draggable={false}
 				onDragStart={() => {return false;}}
 			>
@@ -421,7 +421,7 @@ class VisualEditor extends Component {
 					x={0}
 					y={0}
 					textAnchor="middle"
-				>{dfa.name(state)}</text>
+				>{nfa.name(state)}</text>
 			</g>);
 		}
 

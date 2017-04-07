@@ -1,3 +1,5 @@
+import {intersect} from '../Util/sets.js';
+
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
  * The following special codes are allowed:
@@ -26,26 +28,17 @@ class SymbolGroup {
 	]);
 
 	/**
-	 * Parse a raw input symbol (in the form of a backslash sequence, ~, or a normal character).
-	 * @param {String} input
+	 * Check whether a set of SymbolGroups share any symbols between them.
+	 * @param {Iterable<SymbolGroup>} symbolGroups 
+	 * @returns {Boolean}
 	 */
-	_parseSymbol(input) {
-		if (input[0] === "\\") {
-			const afterBackslash = input.substr(1);
-			const backslashSymbol = this._backslashSymbols.get(afterBackslash);
-			if (backslashSymbol) {
-				return backslashSymbol;
-			} else {
-				return afterBackslash;
-			}
+	static intersect(symbolGroups) {
+		// Symbol sets
+		const sets = [];
+		for (const group of symbolGroups) {
+			sets.push(group._symbols);
 		}
-		if (input === "ε" || input === "~") {
-			return "";
-		}
-		if (input === "␣") {
-			return " ";
-		}
-		return input;
+		return intersect(sets);
 	}
 
 	/**
@@ -116,6 +109,29 @@ class SymbolGroup {
 		}
 
 		this._normalized = symbolsList.join(", ");
+	}
+
+	/**
+	 * Parse a raw input symbol (in the form of a backslash sequence, ~, or a normal character).
+	 * @param {String} input
+	 */
+	_parseSymbol(input) {
+		if (input[0] === "\\") {
+			const afterBackslash = input.substr(1);
+			const backslashSymbol = this._backslashSymbols.get(afterBackslash);
+			if (backslashSymbol) {
+				return backslashSymbol;
+			} else {
+				return afterBackslash;
+			}
+		}
+		if (input === "ε" || input === "~") {
+			return "";
+		}
+		if (input === "␣") {
+			return " ";
+		}
+		return input;
 	}
 
 	/**

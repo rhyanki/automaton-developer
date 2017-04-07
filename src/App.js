@@ -1,10 +1,10 @@
 import React, { Component } from 'react';
-import DFAEditor from './DFAEditor.js';
-import DFA from './Core/DFA.js';
+import NFAEditor from './NFAEditor/NFAEditor.js';
+import NFA from './Core/NFA.js';
 //import logo from './logo.svg';
 import './App.css';
 
-const D1 = new DFA({
+const D1 = new NFA({
 	mutable: false,
 	alphabet: "abc",
 	states: [
@@ -35,7 +35,7 @@ const D1 = new DFA({
 class App extends Component {
 	render() {
 		return (
-			<DFAEditor dfa={D1} />
+			<NFAEditor nfa={D1} />
 		);
 	}
 }
