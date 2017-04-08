@@ -1,6 +1,7 @@
-import React, { Component } from 'react';
-import { Map } from 'immutable';
-import Vector from '../../Util/Vector.js';
+import React, {Component} from 'react';
+import {Map} from 'immutable';
+import LabelledArrow from './LabelledArrow.js';
+import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math.js';
 import './VisualEditor.css';
 
 class VisualEditor extends Component {
@@ -16,7 +17,7 @@ class VisualEditor extends Component {
 		this.NAME_SIZE = 14;
 
 		this.dragging = 0; // The state currently being dragged
-		this.dragPos = null;
+		this.dragPos = null; // The position of the cursor last tick while dragging
 
 		this.state = {
 			positions: Map(),
@@ -64,6 +65,8 @@ class VisualEditor extends Component {
 	startDragging(e, state) {
 		this.dragging = state;
 		this.dragPos = new Vector(e.clientX, e.clientY);
+		// If left-click, this is a state drag; if right-click, it's a transition drag
+		this.dragType = 'S';
 	}
 
 	maybeDrag(e) {
@@ -71,70 +74,28 @@ class VisualEditor extends Component {
 			return;
 		}
 		const newDragPos = new Vector(e.clientX, e.clientY);
-		const diff = newDragPos.minus(this.dragPos);
-		this.setState((prevState, prevProps) => {
-			const oldPos = prevState.positions.get(this.dragging);
-			const newPos = oldPos.plus(diff);
-			return {
-				positions: prevState.positions.set(this.dragging, newPos)
-			};
-		});
+		if (this.dragType === 'S') {
+			// A state is being dragged
+			// Calculate the difference between the cursor's current and previous position, and move the state along that vector
+			const diff = newDragPos.minus(this.dragPos);
+			this.setState((prevState, prevProps) => {
+				const oldPos = prevState.positions.get(this.dragging);
+				const newPos = oldPos.plus(diff);
+				return {
+					positions: prevState.positions.set(this.dragging, newPos)
+				};
+			});
+		} else if (this.dragType === 'T') {
+			// A transition is being drawn
+			
+		}
+		
 		this.dragPos = newDragPos;
 	}
 
 	stopDragging() {
 		// When the mouse is up, stop dragging
 		this.dragging = 0;
-	}
-
-	/**
-	 * Return a control point, which is offset perpendicularly from the midpoint of two points.
-	 * @param {Vector} start The start point.
-	 * @param {Vector} end The end point.
-	 * @param {Number} offset The distance to offset by.
-	 * @returns {Vector} The control point.
-	 */
-	controlPoint(start, end, offset) {
-		const mid = start.midpoint(end);
-		const angle = start.angleTo(end) + Math.PI / 2;
-		return new Vector(
-			Math.floor(mid.x - Math.cos(angle) * offset),
-			Math.floor(mid.y - Math.sin(angle) * offset)
-		);
-	}
-
-	/**
-	 * Normalize an angle so that -π < angle ≤ π.
-	 * @param {Number} angle The angle in radians.
-	 * @returns {Number} The normalized angle.
-	 */
-	normalizeAngle(angle) {
-		if (angle > Math.PI) {
-			while (angle > Math.PI) {
-				angle -= Math.PI * 2;
-			}
-			return angle;
-		}
-		while (angle <= -Math.PI) {
-			angle += Math.PI * 2;
-		}
-		return angle;
-	}
-
-	/**
-	 * Return a position on a quadratic curve at a given t value.
-	 * @param {Vector} start The curve's start point.
-	 * @param {Vector} control The curve's control point.
-	 * @param {Vector} end The curve's end point.
-	 * @param {Number} t The t value, between 0 and 1.
-	 * @returns {Vector} The position at the t value.
-	 */
-	quadraticCurveAt(start, control, end, t) {
-		// This is just the quadratic Bezier formula
-		let ret = start.by(Math.pow(1 - t, 2));
-		ret = ret.plus(control.by(2 * (1 - t) * t));
-		ret = ret.plus(end.by(t * t));
-		return ret;
 	}
 
 	/**
@@ -190,24 +151,6 @@ class VisualEditor extends Component {
 	}
 
 	/**
-	 * Return a polyline consisting of two short lines in the shape of an arrowhead.
-	 * @param {Vector} pos The position of the tip of the arrow.
-	 * @param {Number} angle The angle at which the arrow is pointing. 0 = left, π/2 = down.
-	 * @param {Number} size The length of each line.
-	 * @param {Number} theta The angle between the arrow's lines. Should be less than π.
-	 */
-	renderArrowHead(pos, angle, size, theta) {
-		const t1 = angle - theta / 2;
-		const t2 = angle + theta / 2;
-
-		let points = "" + (pos.x - size * Math.cos(t1)) + "," + (pos.y - size * Math.sin(t1));
-		points += " " + pos.x + "," + pos.y;
-		points += " " + (pos.x - size * Math.cos(t2)) + "," + (pos.y - size * Math.sin(t2));
-
-		return <polyline className="head" points={points} />
-	}
-
-	/**
 	 * Return an array of SVG groups for all transitions from a state.
 	 * @returns {React.Element[]}
 	 */
@@ -215,9 +158,6 @@ class VisualEditor extends Component {
 		const nfa = this.props.nfa;
 		const output = [];
 		const angles = Map().asMutable(); // List of angles around the state's circle at which each transition arrow leaves
-
-		const ARROW_HEAD_SIZE = 10;
-		const ARROW_HEAD_ANGLE = Math.PI / 3;
 
 		for (const state of nfa.states) {
 			angles.set(state, []);
@@ -239,60 +179,40 @@ class VisualEditor extends Component {
 					continue;
 				}
 
-				let d = "M" + originPos.x + " " + originPos.y;
-
 				let control;
-				let symbolsPos;
 
 				// If there is a two-way connection, draw curved lines
 				if (nfa.hasTransition(target, origin)) {
-					control = this.controlPoint(originPos, targetPos, 30);
-					d += " Q " + control.x + " " + control.y + ", " + targetPos.x + " " + targetPos.y;
-					symbolsPos = this.controlPoint(originPos, targetPos, 25);
+					control = perpendicularOffset(originPos, targetPos, 30);
 				} else {
-					d += " L " + targetPos.x + " " + targetPos.y;
 					control = originPos.midpoint(targetPos);
-					symbolsPos = this.controlPoint(originPos, targetPos, 10);
 				}
 
-				const angle = originPos.angleTo(targetPos);
-
-				const targetIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, 1 - this.STATE_RADIUS / dist);
-				const arrowHead = this.renderArrowHead(targetIntersectPos, angle, ARROW_HEAD_SIZE, ARROW_HEAD_ANGLE);
-
-				if (nfa.hasTransition(target, target)) {
-					angles.get(target).push(targetPos.angleTo(targetIntersectPos));
-				}
+				const t = 1 - this.STATE_RADIUS / dist;
 
 				// Push the angle around the state circle from which the transition arrow protrudes
-				const originIntersectPos = this.quadraticCurveAt(originPos, control, targetPos, this.STATE_RADIUS / dist);
 				if (nfa.hasTransition(origin, origin)) {
+					const originIntersectPos = quadraticCurveAt(originPos, control, targetPos, 1 - t);
 					angles.get(origin).push(originPos.angleTo(originIntersectPos));
 				}
 
-				let textAnchor;
-				if (this.normalizeAngle(angle) > 0) {
-					textAnchor = "start";
-				} else {
-					textAnchor = "end";
+				// And the angle at which it enters the target
+				if (nfa.hasTransition(target, target)) {
+					const targetIntersectPos = quadraticCurveAt(originPos, control, targetPos, t);
+					angles.get(target).push(targetPos.angleTo(targetIntersectPos));
 				}
 
-				output.push(<g
+				output.push(<LabelledArrow
 					key={[origin, target]}
 					className="transition"
-				>
-					<g className="arrow">
-						<path className="shaft" d={d} onClick={() => this.props.confirmRemoveTransition(origin, target)} />
-						{arrowHead}
-					</g>
-					<text
-						className="symbol"
-						x={symbolsPos.x}
-						y={symbolsPos.y + 5}
-						textAnchor={textAnchor}
-						onClick={() => this.props.promptUpdateTransitionSymbols(origin, target)}
-					>{symbols.toString()}</text>
-				</g>);
+					start={originPos}
+					control={control}
+					end={targetPos}
+					label={symbols.toString()}
+					arrowHeadT={t}
+					onClickShaft={() => this.props.confirmRemoveTransition(origin, target)}
+					onClickLabel={() => this.props.promptUpdateTransitionSymbols(origin, target)}
+				/>);
 			}
 		}
 
@@ -330,47 +250,16 @@ class VisualEditor extends Component {
 				const start = pos.plus(new Vector(this.STATE_RADIUS, aStart, true));
 				const end = pos.plus(new Vector(this.STATE_RADIUS, aEnd, true));
 
-				let d = "M" + start.x + " " + start.y + " A " + r + " " + r + " 0 1 1 " + end.x + " " + end.y;
-				const symbols = nfa.symbols(state, state);
-				const symbolsPos = pos.plus(new Vector(this.STATE_RADIUS + r * 2.1, angle, true));
-
-				let textAnchor;
-				if (Math.abs(this.normalizeAngle(angle)) > Math.PI / 2) {
-					textAnchor = "end";
-				} else {
-					textAnchor = "start";
-				}
-
-				// Calculate the angle of the arrowhead ...
-				// Basically, we know the two arc points, and the radius.
-				// Draw a triangle between the two arc points and the arc center, and call the two equal angles theta.
-				// Then theta we can see is perpendicular to the gradient of the arc at the end point (assuming the triangle is directly above the main circle)
-				// Then just add the angle from the main circle center to the arc center.
-				// Let d = d between arc points, then
-				// 2 r cos θ = d
-				// So θ = acos(d / 2r)
-				// Then arrowAngle = -π/2 - θ + angle = -π/2 - acos(d / 2r) + angle.
-				const dist = start.distanceTo(end);
-				const arrowAngle = -Math.PI / 2 - Math.acos(dist / (2 * r)) + angle;
-
-				const arrowHead = this.renderArrowHead(end, arrowAngle, ARROW_HEAD_SIZE, ARROW_HEAD_ANGLE);
-
-				output.push(<g
+				output.push(<LabelledArrow
 					key={[state, state]}
 					className="transition"
-				>
-					<g className="arrow">
-						<path className="shaft" d={d} onClick={() => this.props.confirmRemoveTransition(state, state)} />
-						{arrowHead}
-					</g>
-					<text
-						className="symbol"
-						x={symbolsPos.x}
-						y={symbolsPos.y + 5}
-						textAnchor={textAnchor}
-						onClick={() => this.props.promptUpdateTransitionSymbols(state, state)}
-					>{symbols.toString()}</text>
-				</g>);
+					start={start}
+					end={end}
+					radius={r}
+					label={nfa.symbols(state, state).toString()}
+					onClickShaft={() => this.props.confirmRemoveTransition(state, state)}
+					onClickLabel={() => this.props.promptUpdateTransitionSymbols(state, state)}
+				/>);
 			}
 		}
 

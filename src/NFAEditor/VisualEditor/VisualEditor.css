@@ -69,13 +69,13 @@
 	stroke: red;
 }
 
-.VisualEditor .transition .symbol {
+.VisualEditor .transition .label {
 	fill: black;
 	font-size: 12px;
 	font-weight: bold;
 }
 
-.VisualEditor .transition .symbol:hover {
+.VisualEditor .transition .label:hover {
 	fill: aquamarine;
 	cursor: pointer;
 }

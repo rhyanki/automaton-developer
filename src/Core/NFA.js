@@ -400,25 +400,6 @@ class NFA {
 	}
 
 	/**
-	 * Iterate over the potential target states of a transition from a given state.
-	 * @param {Number} origin The origin state ID.
-	 * @param {String} [symbol] The symbol on which to transition. If not given, all potential targets will be yielded.
-	 * @returns {Iterator<Number>} An iterator over the potential targets.
-	 */
-	*targets(origin, symbol) {
-		origin = this.state(origin);
-		if (!origin) {
-			return;
-		}
-		if (symbol === undefined) {
-			yield* this._transitions.get(origin).keys();
-			return;
-		}
-		// TODO
-		throw new Error("targets() incomplete");
-	}
-
-	/**
 	 * Set whether a state is an accept state or not.
 	 * @param {Number} state The state to set.
 	 * @param {Boolean} accept Whether it should be an accept state.
@@ -590,6 +571,25 @@ class NFA {
 			return;
 		}
 		return this._transitions.get(origin).get(target);
+	}
+
+	/**
+	 * Iterate over the potential target states of a transition from a given state.
+	 * @param {Number} origin The origin state ID.
+	 * @param {String} [symbol] The symbol on which to transition. If not given, all potential targets will be yielded.
+	 * @returns {Iterator<Number>} An iterator over the potential targets.
+	 */
+	*targets(origin, symbol) {
+		origin = this.state(origin);
+		if (!origin) {
+			return;
+		}
+		if (symbol === undefined) {
+			yield* this._transitions.get(origin).keys();
+			return;
+		}
+		// TODO
+		throw new Error("targets() incomplete");
 	}
 
 	/**
