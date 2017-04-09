@@ -63,7 +63,7 @@ class ListEditor extends Component {
 	render() {
 		const nfa = this.props.nfa;
 		const rows = this.state.order.map((state) => {
-			return <tr key={state} className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.accept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}>
+			return <tr key={state} className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.isAccept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}>
 				<td>
 					<button onClick={() => this.handleMoveStateUp(state)}><i className="fa fa-chevron-up"></i></button>
 					<button onClick={() => this.handleMoveStateDown(state)}><i className="fa fa-chevron-down"></i></button>
@@ -77,7 +77,7 @@ class ListEditor extends Component {
 					promptUpdateTransitionSymbols={this.props.promptUpdateTransitionSymbols} />
 				</td>
 				<td>
-					<input type="checkbox" onChange={(e) => this.props.updateAccept(state, e.target.checked)} checked={nfa.accept(state)} />
+					<input type="checkbox" onChange={(e) => this.props.updateAccept(state, e.target.checked)} checked={nfa.isAccept(state)} />
 				</td>
 			</tr>;
 		});

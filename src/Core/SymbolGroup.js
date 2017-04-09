@@ -31,7 +31,7 @@ class SymbolGroup {
 	 * @param {Iterable<SymbolGroup>} symbolGroups
 	 * @returns {Boolean}
 	 */
-	static overlap(symbolGroups) {
+	static shareAny(symbolGroups) {
 		const allSymbols = Set().asMutable();
 		for (const group of symbolGroups) {
 			for (const symbol of group._symbols) {

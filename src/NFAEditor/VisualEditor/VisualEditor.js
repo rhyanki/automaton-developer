@@ -446,7 +446,7 @@ class VisualEditor extends PureComponent {
 				onMouseDown={(e) => this.onMouseDownState(e, state)}
 				onMouseEnter={(e) => this.onMouseEnterState(e, state)}
 				onMouseLeave={(e) => this.onMouseLeaveState(e, state)}
-				className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.accept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}
+				className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.isAccept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}
 				draggable={false}
 				onDragStart={() => {return false;}}
 			>
@@ -485,7 +485,7 @@ class VisualEditor extends PureComponent {
 					></i>
 					<i
 						className="fa fa-check btn-edit-state"
-						title={nfa.accept(state) ? "Remove accept state" : "Make accept state"}
+						title={nfa.isAccept(state) ? "Remove accept state" : "Make accept state"}
 						onClick={() => this.props.toggleAccept(state)}
 					></i>
 				</foreignObject>

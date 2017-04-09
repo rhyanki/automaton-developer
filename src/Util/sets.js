@@ -1,9 +1,9 @@
 /**
- * Check whether any number of sets intersect at all.
+ * Check whether any number of sets share any element.
  * @param {Iterable<Set>} sets
  * @returns {Boolean}
  */
-function intersect(sets) {
+function shareAny(sets) {
 	if (sets.length < 2 || sets.size < 2) {
 		return false;
 	}
@@ -19,4 +19,4 @@ function intersect(sets) {
 	return false;
 }
 
-export {intersect};
+export {shareAny};

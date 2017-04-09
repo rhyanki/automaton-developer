@@ -1,6 +1,7 @@
 //import {freeze} from '../Util/immutability.js';
 import {Map, Set} from 'immutable';
 import SymbolGroup from './SymbolGroup.js';
+import {shareAny} from '../Util/sets.js';
 
 /**
 	{
@@ -17,9 +18,6 @@ import SymbolGroup from './SymbolGroup.js';
 		// Set of accept states
 		_accept: Set<state: Number>,
 
-		// Set of current states, if stepping through the machine
-		_current: Set<state: Number>,
-
 		_transitions: Map<
 			origin: Number,
 			transition: Map<
@@ -34,9 +32,20 @@ import SymbolGroup from './SymbolGroup.js';
 		},
 
 		// Automatically generated
-		_generating: Set<state: Number>,
-		_reachable: Set<state: Number>,
-		_dfa: Boolean,
+		_cache.generatingStates: Set<state: Number>,
+		_cache.reachableStates: Set<state: Number>,
+		_cache.isDFA: Boolean,
+
+		// // Extra variables for if stepping through the machine
+
+		// The current input buffer (string of symbols still left to step through)
+		_remaining: String,
+
+		// Set of current possible states (if DFA, this always contains at most one state)
+		_current: Set<state: Number>,
+
+		// Current result (-1, 0, 1) (automatically calculated)
+		_cache.result: Number,
 	}
  *
  * If mutable = true, update functions will directly modify the NFA and its elements (and theirs)
@@ -44,17 +53,43 @@ import SymbolGroup from './SymbolGroup.js';
  * Otherwise, they will create a minimal copy (maintaining as many references as possible) and return
  * the copy.
  * If not mutable, it is possible to do things like compare oldNFA.states === newNFA.states to see if any states have been added or removed.
+ * 
+ * There are a few ways to run the machine:
+ * 1. nfa.accepts(input);
+ * 2. nfa.reset(input); nfa.step(); nfa.step();
+ * 3. nfa.reset(); nfa.read(input); nfa.run();
+ * 3. nfa.reset(); nfa.run(inputChunk); nfa.run(inputChunk);
+ * nfa.result can be used to examine the result at any time.
  */
 class NFA {
-	constructor(template) {
-		this._mutable = true;
-
+	/**
+	 * 
+	 * @param {NFA|Object} template 
+	 * @param {Boolean} [mutable]
+	 */
+	constructor(template, mutable) {
 		// If this is a copy of an existing NFA ...
 		if (template instanceof NFA) {
 			for (var k in template) {
 				this[k] = template[k];
 			}
-			this._mutable = true;
+			if (mutable === undefined) {
+				this._mutable = template._mutable;
+			} else {
+				this._mutable = mutable;
+			}
+			this._cache = {}; // All new NFAs get a new cache
+			if (!this._mutable) {
+				if (template._mutable) {
+					// If the new DFA is immutable but the old one was not, we must explicitly make the new one immutable.
+					this._mutable = true;
+					this.immutable();
+				} else {
+					// The one exception to each NFA having its own cache is if they are both immutable
+					// (and thus will be exactly the same forever).
+					this._cache = template._cache;
+				}
+			}
 			return this;
 		}
 
@@ -67,6 +102,7 @@ class NFA {
 		this._names = Map().asMutable();
 		this._accept = Set().asMutable();
 		this._transitions = Map().asMutable();
+		this._cache = {};
 
 		// Parse input states
 		if (template.states instanceof Array) {
@@ -91,66 +127,14 @@ class NFA {
 
 		this._start = this.state(template.start);
 
-		this._calculateReachable();
-		this._calculateGenerating();
-		this._calculateWhetherDFA();
-
-		// Immutable by default
-		if (!template.mutable) {
+		// If mutable param is given, that will be used; otherwise, template.mutable is used; otherwise, immutable by default.
+		this._mutable = true;
+		if (mutable === undefined) {
+			mutable = template.mutable;
+		}
+		if (!mutable) {
 			this.immutable();
 		}
-	}
-
-	/**
-	 * Determine the generating states (those with a path from the start state to them)
-	 * and add them to this._generating
-	*/
-	_calculateGenerating() {
-		this._generating = Set().asMutable();
-
-		for (const state of this.acceptStates) {
-			this._explore(state, this._generating, true);
-		}
-
-		// This should never be mutated
-		this._generating.asImmutable();
-	}
-
-	/**
-	 * Determine the reachable states (those with a path from the start state to them)
-	 * and add them to this._reachable
-	 */
-	_calculateReachable() {
-		this._reachable = Set().asMutable();
-		if (this._start) {
-			this._explore(this._start, this._reachable);
-		}
-		// This should never be mutated
-		this._reachable.asImmutable();
-	}
-
-	/**
-	 * Calculate whether the NFA is also a DFA, and store it in this._dfa.
-	 * @returns {Boolean}
-	 */
-	_calculateWhetherDFA() {
-		for (const origin of this.states) {
-			const transitions = this.transitionsFrom(origin);
-			// First check whether there are any empty transitions
-			for (const symbols of transitions.values()) {
-				if (symbols.matches("")) {
-					this._dfa = false;
-					return;
-				}
-			}
-
-			// Then check whether any of its transition symbol groups intersect
-			if (SymbolGroup.overlap(transitions.values())) {
-				this._dfa = false;
-				return;
-			}
-		}
-		this._dfa = true;
 	}
 
 	/**
@@ -167,7 +151,7 @@ class NFA {
 		}
 		visited.add(state);
 		if (backwards) {
-			for (const origin of this.states) {
+			for (const origin of this._states) {
 				if (this.hasTransition(origin, state)) {
 					this._explore(origin, visited, backwards);
 				}
@@ -185,7 +169,58 @@ class NFA {
 	 * @returns {Set<Number>} The set of accept states.
 	 */
 	get acceptStates() {
-		return this._accept;
+		return this._accept.asImmutable();
+	}
+
+	/**
+	 * Get the current potential states.
+	 * @returns {Set<Number>} The set of potential states.
+	 */
+	get currentStates() {
+		return this._current.asImmutable();
+	}
+
+	/**
+	 * Get the generating states (those with a path to an accept state).
+	 * @returns {Set<Number>} The set of generating states.
+	 */
+	get generatingStates() {
+		if (!this._cache.generatingStates) {
+			this._cache.generatingStates = Set().asMutable();
+
+			for (const state of this._accept) {
+				this._explore(state, this._cache.generatingStates, true);
+			}
+
+			// This should never be mutated
+			this._cache.generatingStates.asImmutable();
+		}
+		return this._cache.generatingStates;
+	}
+
+	/**
+	 * Get whether the NFA is also a DFA (i.e., each state has only one possible target state to which it can transition on a given symbol).
+	 * @returns {Boolean}
+	 */
+	get isDFA() {
+		if (this._cache.isDFA === undefined || this._cache.isDFA === null) {
+			for (const origin of this._states) {
+				const transitions = this.transitionsFrom(origin);
+				// First check whether there are any empty transitions
+				for (const symbols of transitions.values()) {
+					if (symbols.matches("")) {
+						return this._cache.isDFA = false;
+					}
+				}
+
+				// Then check whether any of its transition symbol groups intersect
+				if (SymbolGroup.shareAny(transitions.values())) {
+					return this._cache.isDFA = false;
+				}
+			}
+			this._cache.isDFA = true;
+		}
+		return this._cache.isDFA;
 	}
 
 	/**
@@ -197,26 +232,71 @@ class NFA {
 	}
 
 	/**
+	 * Get the reachable states (those with a path from the start state to them).
+	 * @returns {Set<Number>} The set of reachable states.
+	 */
+	get reachableStates() {
+		if (!this._cache.reachableStates) {
+			this._cache.reachableStates = Set().asMutable();
+			if (this._start) {
+				this._explore(this._start, this._cache.reachableStates);
+			}
+			// This should never be mutated
+			this._cache.reachableStates.asImmutable();
+		}
+		return this._cache.reachableStates;
+	}
+
+	/**
+	 * Get the remaining input.
+	 * @returns {String}
+	 */
+	get remainingInput() {
+		return this._remaining;
+	}
+
+	/**
+	 * Get the result of the current run.
+	 * 0 if inconclusive (future input could result in accept), -1 if definite reject, 1 if accept.
+	 * @returns {Number}
+	 */
+	get result() {
+		if (this._result === undefined || this._result === null) {
+			if (shareAny(this._current, this._accept)) {
+				this._result = 1;
+			} else if (shareAny(this._current, this.generatingStates)) {
+				this._result = 0;
+			} else {
+				this._result = -1;
+			}
+		}
+		return this._result;
+	}
+
+	/**
 	 * @returns {Set<Number>} Set of the NFA's states.
 	 */
 	get states() {
-		return this._states;
+		return this._states.asImmutable();
 	}
 
 	/**
 	 * @returns {Map<Number, Map>} Map of the NFA's transitions, of the form Map<origin: Number, Map<target: Number, symbols: SymbolGroup>.
 	 */
 	get transitions() {
-		return this._transitions;
+		return this._transitions.asImmutable();
 	}
 
 	/**
-	 * Check whether a given state is an accept state.
-	 * @param {Number} state The state to check.
-	 * @returns {Boolean}
+	 * Return whether the NFA accepts the given input or not.
+	 * Does not mutate the NFA, even if it is mutable.
+	 * @param {String} input The input string.
 	 */
-	accept(state) {
-		return this._accept.has(this.state(state));
+	accepts(input) {
+		const nfa = this.mutable(true);
+		nfa.reset();
+		nfa.run(input);
+		return nfa.result === 1;
 	}
 
 	/**
@@ -233,13 +313,11 @@ class NFA {
 		const id = this._shared.nextID;
 		this._shared.nextID++;
 
-		const nfa = this.mutable();
+		const nfa = this.mutable(true); // Note that the entire cache can be copied
 
 		nfa._states = nfa._states.asMutable().add(id);
 		nfa._names = nfa._names.asMutable().set(id, name);
 		nfa._transitions = nfa._transitions.asMutable().set(id, Map());
-
-		// Note that the new state is trivially neither reachable nor generating, so no need to recalculate those.
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -249,12 +327,20 @@ class NFA {
 	}
 
 	/**
+	 * Return a shallow copy of the NFA.
+	 * @returns {NFA}
+	 */
+	copy() {
+		return new NFA(this);
+	}
+
+	/**
 	 * Check whether the given state is generating (has a path to an accept state).
 	 * @param {Number} state The state to check.
 	 * @returns {Boolean}
 	 */
 	generating(state) {
-		return this._generating.has(this.state(state));
+		return this.generatingStates.has(this.state(state));
 	}
 
 	/**
@@ -288,16 +374,20 @@ class NFA {
 		this._states.asImmutable();
 		this._names.asImmutable();
 		this._transitions.asImmutable();
+		if (this._current) {
+			this._current.asImmutable();
+		}
 		Object.freeze(this);
 		return this;
 	}
 
 	/**
-	 * Return whether the NFA is also a DFA (i.e., each state has only one possible target state to which it can transition on a given symbol).
+	 * Check whether a given state is an accept state.
+	 * @param {Number} state The state to check.
 	 * @returns {Boolean}
 	 */
-	isDFA() {
-		return this._dfa;
+	isAccept(state) {
+		return this._accept.has(this.state(state));
 	}
 
 	/**
@@ -311,15 +401,26 @@ class NFA {
 	}
 
 	/**
-	 * Return a shallow, mutable copy of this NFA (or itself it is already mutable).
+	 * Return a shallow, mutable copy of this NFA (or itself it is already mutable). Also empties the cache, thus fully preparing it for modification.
 	 * It will be mutable, so it can have elements replaced if need be (but any previously immutable elements will remain so).
+	 * @param {Boolean} [copyCache = false] Whether to copy/keep the cache from the old object.
 	 * @returns {NFA}
 	 */
-	mutable() {
+	mutable(copyCache) {
 		if (this._mutable) {
+			if (!copyCache) {
+				this._cache = {};
+			}
 			return this;
 		}
-		return new NFA(this);
+		const nfa = new NFA(this, true);
+		nfa._cache = {};
+		if (copyCache) {
+			for (const key in this._cache) {
+				nfa._cache[key] = this._cache[key];
+			}
+		}
+		return nfa;
 	}
 
 	/**
@@ -337,7 +438,7 @@ class NFA {
 	 * @returns {Boolean}
 	 */
 	reachable(state) {
-		return this._reachable.has(this.state(state));
+		return this.reachableStates.has(this.state(state));
 	}
 
 	/**
@@ -352,6 +453,7 @@ class NFA {
 			return this;
 		}
 
+		const cache = this._cache;
 		const nfa = this.mutable();
 
 		// Delete all transitions from the state
@@ -364,11 +466,9 @@ class NFA {
 		}
 		nfa._states = nfa._states.asMutable().delete(state);
 
-		nfa._calculateGenerating();
-		nfa._calculateReachable();
-		if (!nfa.isDFA()) {
-			// It might have become a DFA
-			nfa._calculateWhetherDFA();
+		// If the NFA was a DFA, it definitely still is.
+		if (cache.isDFA) {
+			nfa._cache.isDFA = true;
 		}
 
 		if (!this._mutable) {
@@ -391,17 +491,75 @@ class NFA {
 			return this;
 		}
 
+		const cache = this._cache;
 		const nfa = this.mutable();
 		const transitions = nfa._transitions.get(origin).asMutable();
 		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.delete(target));
 
-		nfa._calculateGenerating();
-		nfa._calculateReachable();
-		if (!nfa.isDFA()) {
-			// It might have become a DFA
-			nfa._calculateWhetherDFA();
+		// If the NFA was a DFA, it definitely still is.
+		if (cache.isDFA) {
+			nfa._cache.isDFA = true;
 		}
 
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
+	 * Set up the NFA to be run, resetting to the start state and erasing the input buffer.
+	 * @param {String} [input] The (initial) input to add to the input buffer.
+	 */
+	reset(input) {
+		const nfa = this.mutable(true);
+		delete nfa._cache.result;
+
+		nfa._current = Set().asMutable();
+		nfa._current = nfa._current.add(this.start);
+		nfa._remaining = "";
+		if (input) {
+			nfa._remaining = input;
+		}
+
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
+	 * Run the NFA on the remaining input, stopping early if a definite rejection is reached.
+	 * @param {String} [input] Optional input to add to the remaining input before running.
+	 * @returns {NFA}
+	 */
+	run(input) {
+		const nfa = this.mutable(true);
+		if (input) {
+			nfa.read(input);
+		}
+		while (nfa.remainingInput && nfa.result !== 1) {
+			nfa.step();
+		}
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
+	 * Run the NFA on the entire remaining input, continuing to run even if a definite rejection is reached.
+	 * @param {String} [input] The (initial) input to add to the input buffer.
+	 * @returns {NFA}
+	 */
+	runComplete(input) {
+		const nfa = this.mutable(true);
+		if (input) {
+			nfa.read(input);
+		}
+		while (nfa.remainingInput) {
+			nfa.step();
+		}
 		if (!this._mutable) {
 			nfa.immutable();
 		}
@@ -422,6 +580,7 @@ class NFA {
 			return this;
 		}
 
+		const cache = this._cache;
 		const nfa = this.mutable();
 
 		nfa._accept = nfa._accept.asMutable();
@@ -431,7 +590,8 @@ class NFA {
 			nfa._accept = nfa._accept.delete(state);
 		}
 
-		nfa._calculateGenerating();
+		nfa._cache.generatingStates = cache.generatingStates;
+		nfa._cache.isDFA = cache.isDFA;
 
 		if (!this._mutable) {
 			console.log("Making immutable again");
@@ -474,9 +634,13 @@ class NFA {
 			return this;
 		}
 
+		const cache = this._cache;
 		const nfa = this.mutable();
 		nfa._start = state;
-		nfa._calculateReachable();
+
+		nfa._cache.generatingStates = cache.generatingStates;
+		nfa._cache.isDFA = cache.isDFA;
+		nfa._cache.result = cache.result;
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -509,17 +673,18 @@ class NFA {
 			}
 		}
 
+		const cache = this._cache;
 		const nfa = this.mutable();
+
 		const transitions = nfa._transitions.get(origin).asMutable();
 		// Update the transition
 		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.set(target, symbols));
 
-		// Note that the graph structure itself is unchanged, unless a transition was created
-		if (creatingNew) {
-			nfa._calculateGenerating();
-			nfa._calculateReachable();
+		// Note that the graph structure itself is unchanged if a new transition is not being created
+		if (!creatingNew) {
+			nfa._cache.generatingStates = cache.generatingStates;
+			nfa._cache.reachableStates = cache.reachableStates;
 		}
-		nfa._calculateWhetherDFA();
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -543,17 +708,16 @@ class NFA {
 			return this;
 		}
 
+		const cache = this._cache;
 		const nfa = this.mutable();
 
 		const newSymbols = this.symbols(origin, oldTarget).merge(this.symbols(origin, newTarget));
 		nfa.removeTransition(origin, oldTarget);
 		nfa.setTransition(origin, newTarget, newSymbols);
 
-		nfa._calculateReachable();
-		nfa._calculateGenerating();
-		if (!nfa.isDFA()) {
-			// It might have become a DFA (if any targets were merged)
-			nfa._calculateWhetherDFA();
+		if (cache.isDFA) {
+			// If it was a DFA before, it definitely still is now (and might have become one if transitions were merged)
+			nfa._cache.isDFA = cache.isDFA;
 		}
 
 		if (!this._mutable) {
@@ -573,6 +737,24 @@ class NFA {
 			return 0;
 		}
 		return state;
+	}
+
+	/**
+	 * Consume the next symbol from the remaining input, updating the NFA's current states accordingly.
+	 * @returns {NFA}
+	 */
+	step() {
+		if (!this.remainingInput) {
+			return this;
+		}
+		const nfa = this.mutable(true);
+
+		// TODO
+
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
 	}
 
 	/**

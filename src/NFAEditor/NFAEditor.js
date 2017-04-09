@@ -136,8 +136,8 @@ class NFAEditor extends Component {
 				<br/><br/>
 				<button
 					className="btn btn-default"
-					disabled={nfa.isDFA()}
-				>{nfa.isDFA() ? "Already a DFA" : "Convert to DFA"}</button>
+					disabled={nfa.isDFA}
+				>{nfa.isDFA ? "Already a DFA" : "Convert to DFA"}</button>
 				<br/><br/>
 				<button className="btn btn-default" onClick={() => console.log(this.state.nfa)}>Log NFA to console</button>
 			</div>
