@@ -459,7 +459,7 @@ class VisualEditor extends PureComponent {
 					x={-0.5 * this.STATE_RADIUS}
 					y={-0.8 * this.STATE_RADIUS}
 					width={this.STATE_RADIUS}
-					height={this.STATE_RADIUS}
+					height={this.STATE_RADIUS * 0.5}
 				>
 					<i
 						className={"fa fa-flag-checkered" + (!nfa.isStart(state) ? " btn-edit-state" : "")}
@@ -471,7 +471,7 @@ class VisualEditor extends PureComponent {
 					x={-0.5 * this.STATE_RADIUS}
 					y={0.4 * this.STATE_RADIUS}
 					width={this.STATE_RADIUS}
-					height={this.STATE_RADIUS}
+					height={this.STATE_RADIUS * 0.5}
 				>
 					<i
 						className="fa fa-pencil btn-edit-state"

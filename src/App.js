@@ -7,6 +7,7 @@ import './App.css';
 const D1 = new NFA({
 	mutable: false,
 	alphabet: "abc",
+	start: 1,
 	states: [
 		{name: "Start", transitions: [ // 1
 			[2, 'a'],

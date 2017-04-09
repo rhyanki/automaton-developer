@@ -140,11 +140,12 @@ class NFA {
 	/**
 	 * Perform a DFS from (and including) the given state on its transitions.
 	 * @param {Number} state The state to start from. If it has been visited already, _explore() will do nothing.
-	 * @param {Set<Number>} visited The set of visited states. This will be modified by the function.
+	 * @param {Set<Number>} visited The set of visited states. Must be mutable (and will be modified).
 	 * @param {Boolean} [backwards = false] Whether to go backwards (so states that transition TO the given state will be explored instead).
+	 * @param {String} [symbol] If provided, only transitions on this symbol will be followed.
 	 * @returns {Set<Number>} The (modified) set of visited states.
 	 */
-	_explore(state, visited, backwards) {
+	_explore(state, visited, backwards, symbol) {
 		backwards = backwards || false;
 		if (visited.has(state)) {
 			return visited;
@@ -152,16 +153,33 @@ class NFA {
 		visited.add(state);
 		if (backwards) {
 			for (const origin of this._states) {
-				if (this.hasTransition(origin, state)) {
-					this._explore(origin, visited, backwards);
+				if (this.hasTransition(origin, state, symbol)) {
+					this._explore(origin, visited, backwards, symbol);
 				}
 			}
 		} else {
-			for (const target of this.targets(state)) {
-				this._explore(target, visited, backwards);
+			for (const [target, symbols] of this.transitionsFrom(state)) {
+				if (symbol !== undefined && !symbols.matches(symbol)) {
+					continue;
+				}
+				this._explore(target, visited, backwards, symbol);
 			}
 		}
 		return visited;
+	}
+
+	/**
+	 * Given a set of states, add any states reachable via empty transitions.
+	 * @param {Set<Number>} states The set of current states. Must be mutable.
+	 * @param {Set<Number>} [statesToCheck] Which states to actually check (i.e., follow their empty transitions). Defaults to all of them.
+	 * @returns {Set<Number>} The new set of states.
+	 */
+	_followEmptyTransitions(states) {
+		for (const state of states) {
+			states.remove(state); // So that explore() doesn't end immediately
+			this._explore(state, states, false, "");
+		}
+		return states;
 	}
 
 	/**
@@ -261,16 +279,24 @@ class NFA {
 	 * @returns {Number}
 	 */
 	get result() {
-		if (this._result === undefined || this._result === null) {
-			if (shareAny(this._current, this._accept)) {
-				this._result = 1;
-			} else if (shareAny(this._current, this.generatingStates)) {
-				this._result = 0;
+		if (this._cache.result === undefined || this._cache.result === null) {
+			if (shareAny([this._current, this._accept])) {
+				this._cache.result = 1;
+			} else if (shareAny([this._current, this.generatingStates])) {
+				this._cache.result = 0;
 			} else {
-				this._result = -1;
+				this._cache.result = -1;
 			}
 		}
-		return this._result;
+		return this._cache.result;
+	}
+
+	/**
+	 * Get the NFA's start state.
+	 * @returns {Number}
+	 */
+	get start() {
+		return this._start;
 	}
 
 	/**
@@ -347,15 +373,22 @@ class NFA {
 	 * Return whether there is a transition from one state to another.
 	 * @param {Number} origin The origin state ID.
 	 * @param {Number} target The origin state ID.
+	 * @param {String} [symbol] If provided, will only return true if the transition is on this symbol.
 	 * @returns {Boolean}
 	 */
-	hasTransition(origin, target) {
+	hasTransition(origin, target, symbol) {
 		origin = this.state(origin);
 		target = this.state(target);
 		if (!origin || !target || !this._transitions.has(origin)) {
-			return;
+			return false;
 		}
-		return this._transitions.get(origin).has(target);
+		if (!this._transitions.get(origin).has(target)) {
+			return false;
+		}
+		if (symbol !== undefined && !this.symbols(origin, target).matches(symbol)) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -442,6 +475,20 @@ class NFA {
 	}
 
 	/**
+	 * Add the given input to the NFA's remaining input buffer.
+	 * @param {String} input 
+	 * @returns {NFA}
+	 */
+	read(input) {
+		const nfa = this.mutable(true);
+		nfa._remaining += input;
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
 	 * Remove a state (and all associated transitions).
 	 * @param {Number} state
 	 * @returns {NFA}
@@ -461,7 +508,6 @@ class NFA {
 
 		// Delete all transitions to the state
 		for (const origin of nfa._transitions.keys()) {
-			console.log("Removing transition from " + origin + " to " + state);
 			nfa.removeTransition(origin, state);
 		}
 		nfa._states = nfa._states.asMutable().delete(state);
@@ -521,6 +567,7 @@ class NFA {
 		if (input) {
 			nfa._remaining = input;
 		}
+		nfa._current = nfa._followEmptyTransitions(nfa._current);
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -534,11 +581,14 @@ class NFA {
 	 * @returns {NFA}
 	 */
 	run(input) {
+		if (this.result === -1) {
+			return this;
+		}
 		const nfa = this.mutable(true);
 		if (input) {
 			nfa.read(input);
 		}
-		while (nfa.remainingInput && nfa.result !== 1) {
+		while (nfa.remainingInput && nfa.result !== -1) {
 			nfa.step();
 		}
 		if (!this._mutable) {
@@ -576,7 +626,7 @@ class NFA {
 		state = this.state(state);
 		accept = Boolean(accept);
 
-		if (!state || this.accept(state) === accept) {
+		if (!state || this.isAccept(state) === accept) {
 			return this;
 		}
 
@@ -748,8 +798,25 @@ class NFA {
 			return this;
 		}
 		const nfa = this.mutable(true);
+		delete nfa._cache.result;
 
-		// TODO
+		// Get the next symbol; for now, assume no combining characters
+		const symbol = this._remaining[0];
+		this._remaining = this._remaining.substr(1);
+
+		// Follow each applicable transition from each of the current states
+		const newStates = Set().asMutable();
+		for (const origin of nfa._current) {
+			for (const [target, symbols] of nfa.transitionsFrom(origin)) {
+				if (symbols.matches(symbol)) {
+					newStates.add(target);
+				}
+			}
+		}
+
+		// And follow all empty transitions from the resultant states
+		nfa._followEmptyTransitions(newStates);
+		nfa._current = newStates;
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -812,7 +879,7 @@ class NFA {
 	 * @returns {NFA} The new NFA.
 	 */
 	toggleAccept(state) {
-		return this.setAccept(state, !this.accept(state));
+		return this.setAccept(state, !this.isAccept(state));
 	}
 
 	/**
