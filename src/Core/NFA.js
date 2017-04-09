@@ -134,8 +134,17 @@ class NFA {
 	 * @returns {Boolean}
 	 */
 	_calculateWhetherDFA() {
-		// For each state, check whether any of its transition symbol groups intersect
-		for (const [, transitions] of this.transitions) {
+		for (const origin of this.states) {
+			const transitions = this.transitionsFrom(origin);
+			// First check whether there are any empty transitions
+			for (const symbols of transitions.values()) {
+				if (symbols.matches("")) {
+					this._dfa = false;
+					return;
+				}
+			}
+
+			// Then check whether any of its transition symbol groups intersect
 			if (SymbolGroup.overlap(transitions.values())) {
 				this._dfa = false;
 				return;
@@ -433,27 +442,6 @@ class NFA {
 	}
 
 	/**
-	 * Set a new start state.
-	 * @param {Number} state The new start state.
-	 * @returns {NFA} The new NFA.
-	 */
-	setStart(state) {
-		state = this.state(state);
-		if (this.isStart(state)) {
-			return this;
-		}
-
-		const nfa = this.mutable();
-		nfa._start = state;
-		nfa._calculateReachable();
-
-		if (!this._mutable) {
-			nfa.immutable();
-		}
-		return nfa;
-	}
-
-	/**
 	 * Set the name of a state.
 	 * @param {Number} state The state to set.
 	 * @param {String} name The new name.
@@ -476,6 +464,27 @@ class NFA {
 	}
 
 	/**
+	 * Set a new start state.
+	 * @param {Number} state The new start state.
+	 * @returns {NFA} The new NFA.
+	 */
+	setStart(state) {
+		state = this.state(state);
+		if (this.isStart(state)) {
+			return this;
+		}
+
+		const nfa = this.mutable();
+		nfa._start = state;
+		nfa._calculateReachable();
+
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
 	 * Set the symbols of a transition (creating the transition if it does not exist).
 	 * @param {Number} id ID of the origin state.
 	 * @param {Number} target ID of the target state.
@@ -490,10 +499,14 @@ class NFA {
 			return this;
 		}
 
+		let creatingNew = true;
+
 		symbols = new SymbolGroup(symbols);
-		console.log(symbols);
-		if (symbols.equals(this.symbols(origin, target))) {
-			return this;
+		if (this.hasTransition(origin, target)) {
+			creatingNew = false;
+			if (symbols.equals(this.symbols(origin, target))) {
+				return this;
+			}
 		}
 
 		const nfa = this.mutable();
@@ -501,7 +514,11 @@ class NFA {
 		// Update the transition
 		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.set(target, symbols));
 
-		// Note that the graph structure itself is unchanged, so no need to recalculate generating or reachable.
+		// Note that the graph structure itself is unchanged, unless a transition was created
+		if (creatingNew) {
+			nfa._calculateGenerating();
+			nfa._calculateReachable();
+		}
 		nfa._calculateWhetherDFA();
 
 		if (!this._mutable) {
@@ -571,6 +588,21 @@ class NFA {
 			return;
 		}
 		return this._transitions.get(origin).get(target);
+	}
+
+	/**
+	 * Return the symbols of a transition from one state to another, as a string.
+	 * @param {Number} origin The origin state ID.
+	 * @param {Number} target The target state ID.
+	 * @returns {String} The symbols as a string, or empty string if there is no such transition.
+	 */
+	symbolsString(origin, target) {
+		const symbols = this.symbols(origin, target);
+		if (!symbols) {
+			return "";
+		} else {
+			return symbols.toString();
+		}
 	}
 
 	/**

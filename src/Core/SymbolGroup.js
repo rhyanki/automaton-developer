@@ -1,5 +1,24 @@
 import {Set} from 'immutable';
 
+const _allowedCharsRegex = /^[\x00-\x7Fε␣]*$/;
+const _backslashSymbols = new Map([
+	["n", "\n"],
+	["r", "\r"],
+	["t", "\t"],
+	["f", "\f"],
+	["v", "\v"],
+]);
+const _toBackslash = new Map([
+	["~", "~"],
+	[",", ","],
+	["\\", "\\"],
+	["\n", "n"],
+	["\r", "r"],
+	["\t", "t"],
+	["\f", "f"],
+	["\v", "v"],
+]);
+
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
  * The following special codes are allowed:
@@ -7,26 +26,6 @@ import {Set} from 'immutable';
  *		a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
  */
 class SymbolGroup {
-
-	_allowedCharsRegex = /^[\x00-\x7Fε␣]*$/;
-	_backslashSymbols = new Map([
-		["n", "\n"],
-		["r", "\r"],
-		["t", "\t"],
-		["f", "\f"],
-		["v", "\v"],
-	]);
-	_toBackslash = new Map([
-		["~", "~"],
-		[",", ","],
-		["\\", "\\"],
-		["\n", "n"],
-		["\r", "r"],
-		["\t", "t"],
-		["\f", "f"],
-		["\v", "v"],
-	]);
-
 	/**
 	 * Check whether a set of SymbolGroups share any symbols between them.
 	 * @param {Iterable<SymbolGroup>} symbolGroups
@@ -51,7 +50,7 @@ class SymbolGroup {
 	constructor(input) {
 		this._symbols = Set().asMutable();
 
-		if (!this._allowedCharsRegex.test(input)) {
+		if (!_allowedCharsRegex.test(input)) {
 			throw new Error("Only ASCII characters are allowed for now.");
 		}
 
@@ -103,8 +102,8 @@ class SymbolGroup {
 
 		for (let i = 0; i < symbolsList.length; i++) {
 			const symbol = symbolsList[i];
-			if (this._toBackslash.has(symbol)) {
-				symbolsList[i] = "\\" + this._toBackslash.get(symbol);
+			if (_toBackslash.has(symbol)) {
+				symbolsList[i] = "\\" + _toBackslash.get(symbol);
 			} else if (symbol === "") {
 				symbolsList[i] = "ε";
 			} else if (symbol === " ") {
@@ -123,7 +122,7 @@ class SymbolGroup {
 	_parseSymbol(input) {
 		if (input[0] === "\\") {
 			const afterBackslash = input.substr(1);
-			const backslashSymbol = this._backslashSymbols.get(afterBackslash);
+			const backslashSymbol = _backslashSymbols.get(afterBackslash);
 			if (backslashSymbol) {
 				return backslashSymbol;
 			} else {

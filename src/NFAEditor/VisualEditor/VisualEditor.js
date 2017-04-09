@@ -1,10 +1,10 @@
-import React, {Component} from 'react';
+import React, {PureComponent} from 'react';
 import {Map} from 'immutable';
 import LabelledArrow from './LabelledArrow.js';
 import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math.js';
 import './VisualEditor.css';
 
-class VisualEditor extends Component {
+class VisualEditor extends PureComponent {
 	constructor(props) {
 		super(props);
 
@@ -16,11 +16,12 @@ class VisualEditor extends Component {
 		this.STATE_RADIUS = 50;
 		this.NAME_SIZE = 14;
 
-		this.dragging = 0; // The state currently being dragged
-		this.dragPos = null; // The position of the cursor last tick while dragging
-
 		this.state = {
 			positions: Map(),
+			cursorPos: null,
+			draggingState: 0,
+			drawingTransitionOrigin: 0,
+			drawingTransitionTarget: 0,
 		};
 		Object.freeze(this.state);
 	}
@@ -51,51 +52,199 @@ class VisualEditor extends Component {
 		}
 	}
 
-	shouldComponentUpdate(nextProps, nextState) {
-		// Component only needs to update if the NFA or positions changed
-		if (this.props.nfa !== nextProps.nfa) {
-			return true;
-		}
-		if (this.state.positions !== nextState.positions) {
-			return true;
-		}
-		return false;
+	/**
+	 * Start dragging a state.
+	 * @param {Event} state
+	 * @param {Number} cursorPos The initial cursor position.
+	 */
+	dragStateStart(state, cursorPos) {
+		this.setState({
+			cursorPos: cursorPos,
+			draggingState: state,
+		});
 	}
 
-	startDragging(e, state) {
-		this.dragging = state;
-		this.dragPos = new Vector(e.clientX, e.clientY);
-		// If left-click, this is a state drag; if right-click, it's a transition drag
-		this.dragType = 'S';
-	}
-
-	maybeDrag(e) {
-		if (!this.dragging) {
+	/**
+	 * Continue dragging the currently dragged state.
+	 * @param {Number} cursorPos
+	 */
+	dragStateContinue(cursorPos) {
+		if (!this.isDraggingState()) {
 			return;
 		}
-		const newDragPos = new Vector(e.clientX, e.clientY);
-		if (this.dragType === 'S') {
-			// A state is being dragged
-			// Calculate the difference between the cursor's current and previous position, and move the state along that vector
-			const diff = newDragPos.minus(this.dragPos);
-			this.setState((prevState, prevProps) => {
-				const oldPos = prevState.positions.get(this.dragging);
-				const newPos = oldPos.plus(diff);
-				return {
-					positions: prevState.positions.set(this.dragging, newPos)
-				};
-			});
-		} else if (this.dragType === 'T') {
-			// A transition is being drawn
-			
-		}
-		
-		this.dragPos = newDragPos;
+		// A state is being dragged
+		// Calculate the difference between the cursor's current and previous position, and move the state along that vector
+		this.setState((prevState, prevProps) => {
+			const diff = cursorPos.minus(prevState.cursorPos);
+			const oldPos = prevState.positions.get(prevState.draggingState);
+			const newPos = oldPos.plus(diff);
+			return {
+				positions: prevState.positions.set(prevState.draggingState, newPos),
+				cursorPos: cursorPos,
+			};
+		});
 	}
 
-	stopDragging() {
-		// When the mouse is up, stop dragging
-		this.dragging = 0;
+	/**
+	 * Stop dragging a state.
+	 */
+	dragStateStop() {
+		this.setState({draggingState: 0});
+	}
+
+	/**
+	 * Cancel drawing the current transition.
+	 */
+	drawTransitionCancel() {
+		console.log("drawTransitionCancel");
+		this.setState({drawingTransitionOrigin: 0, drawingTransitionTarget: 0});
+	}
+
+	/**
+	 * Complete drawing a transition, creating the new transition if possible.
+	 */
+	drawTransitionComplete() {
+		if (!this.isDrawingTransition()) {
+			return;
+		}
+		console.log("drawTransitionComplete");
+		if (this.state.drawingTransitionOrigin && this.state.drawingTransitionTarget) {
+			this.props.promptAddTransition(this.state.drawingTransitionOrigin, this.state.drawingTransitionTarget);
+		}
+		this.drawTransitionCancel();
+	}
+
+	/**
+	 * Continue drawing a transition.
+	 * @param {Number} cursorPos The current cursor position.
+	 */
+	drawTransitionContinue(cursorPos) {
+		if (!this.isDrawingTransition()) {
+			return;
+		}
+		this.setState({cursorPos: cursorPos});
+	}
+
+	/**
+	 * Start drawing (or moving) a transition.
+	 * @param {Number} origin The origin state.
+	 * @param {Vector} cursorPos The initial cursor position.
+	 */
+	drawTransitionStart(origin, cursorPos) {
+		console.log("drawTransitionStart");
+		this.setState({
+			cursorPos: cursorPos,
+			drawingTransitionOrigin: origin,
+			drawingTransitionTarget: 0,
+		});
+	}
+
+	/**
+	 * Set a target for the transition being drawn.
+	 * @param {Number} target The new target (0 for no target).
+	 */
+	drawTransitionSetTarget(target) {
+		if (!this.isDrawingTransition()) {
+			return;
+		}
+		this.setState({drawingTransitionTarget: target});
+	}
+
+	/**
+	 * Convert DOM coordinates to SVG coordinates.
+	 * @param {Number|Vector} x
+	 * @param {Number} [y]
+	 */
+	getSVGPoint(x, y) {
+		if (x instanceof Vector) {
+			y = x.y;
+			x = x.x;
+		}
+		let point = this.refs.svg.createSVGPoint();
+		point.x = x;
+		point.y = y;
+		point = point.matrixTransform(this.refs.svg.getScreenCTM().inverse());
+		return new Vector(point.x, point.y);
+	}
+
+	/**
+	 * Check whether a state is being dragged.
+	 * @param {Boolean}
+	 */
+	isDraggingState() {
+		return !!this.state.draggingState;
+	}
+
+	/**
+	 * Check whether a transition is being drawn.
+	 * @param {Boolean}
+	 */
+	isDrawingTransition() {
+		return this.state.drawingTransitionOrigin || this.state.drawingTransitionTarget;
+	}
+
+	/**
+	 * Event handler for when the mouse is pressed on a state.
+	 * @param {Event} e
+	 * @param {Number} state
+	 */
+	onMouseDownState(e, state) {
+		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
+		// If left-click, this is a state drag; if right-click, it's a transition drag
+		if (e.button === 0) {
+			this.dragStateStart(state, cursorPos);
+		} else if (e.button === 2) {
+			this.drawTransitionStart(state, cursorPos);
+		}
+	}
+
+	/**
+	 * Event handler for when the mouse enters a state.
+	 * @param {Event} e
+	 * @param {Number} state
+	 */
+	onMouseEnterState(e, state) {
+		if (this.isDrawingTransition()) {
+			this.drawTransitionSetTarget(state);
+		}
+	}
+
+	/**
+	 * Event handler for when the mouse leaves the editor.
+	 */
+	onMouseLeave() {
+		this.dragStateStop();
+		this.drawTransitionCancel();
+	}
+
+	/**
+	 * Event handler for when the mouse leaves a state.
+	 */
+	onMouseLeaveState() {
+		this.drawTransitionSetTarget(0);
+	}
+
+	/**
+	 * Event handler for when the mouse moves on the editor.
+	 * @param {Event} e
+	 */
+	onMouseMove(e) {
+		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
+		this.dragStateContinue(cursorPos);
+		this.drawTransitionContinue(cursorPos);
+	}
+
+	/**
+	 * Event handler for when the mouse is released on the editor.
+	 * @param {Event} e
+	 */
+	onMouseUp(e) {
+		if (e.button === 2) {
+			// Stop the context menu from appearing, if a right-click
+			e.preventDefault();
+		}
+		this.dragStateStop();
+		this.drawTransitionComplete();
 	}
 
 	/**
@@ -155,7 +304,7 @@ class VisualEditor extends Component {
 	 * @returns {React.Element[]}
 	 */
 	renderTransitions() {
-		const nfa = this.props.nfa;
+		let nfa = this.props.nfa;
 		const output = [];
 		const angles = Map().asMutable(); // List of angles around the state's circle at which each transition arrow leaves
 
@@ -163,9 +312,19 @@ class VisualEditor extends Component {
 			angles.set(state, []);
 		};
 
+		// If a transition is being drawn or moved, this overrides the NFA's actual transitions as far as rendering is concerned
+		if (this.isDrawingTransition()) {
+			const origin = this.state.drawingTransitionOrigin;
+			const target = this.state.drawingTransitionTarget;
+			if (!nfa.hasTransition(origin, target)) {
+				nfa = nfa.setTransition(origin, target, this.state.drawingTransitionSymbols || "?");
+			}
+		}
+
+		// Render interstate transitions
 		for (const origin of nfa.states) {
 			const originPos = this.pos(origin);
-			for (const [target, symbols] of nfa.transitionsFrom(origin)) {
+			for (const [target,] of nfa.transitionsFrom(origin)) {
 				if (origin === target) {
 					// Will need to make special case for self-connections
 					continue;
@@ -208,7 +367,7 @@ class VisualEditor extends Component {
 					start={originPos}
 					control={control}
 					end={targetPos}
-					label={symbols.toString()}
+					label={nfa.symbolsString(origin, target)}
 					arrowHeadT={t}
 					onClickShaft={() => this.props.confirmRemoveTransition(origin, target)}
 					onClickLabel={() => this.props.promptUpdateTransitionSymbols(origin, target)}
@@ -216,6 +375,7 @@ class VisualEditor extends Component {
 			}
 		}
 
+		// Render self-transitions
 		for (const state of nfa.states) {
 			if (nfa.hasTransition(state, state)) {
 				const pos = this.pos(state);
@@ -256,11 +416,21 @@ class VisualEditor extends Component {
 					start={start}
 					end={end}
 					radius={r}
-					label={nfa.symbols(state, state).toString()}
+					label={nfa.symbolsString(state, state)}
 					onClickShaft={() => this.props.confirmRemoveTransition(state, state)}
 					onClickLabel={() => this.props.promptUpdateTransitionSymbols(state, state)}
 				/>);
 			}
+		}
+
+		// Render transition currently being drawn
+		if (this.state.drawingTransitionOrigin && !this.state.drawingTransitionTarget) {
+			output.push(<LabelledArrow
+				key="DRAWING"
+				className="transition editing"
+				start={this.pos(this.state.drawingTransitionOrigin)}
+				end={this.state.cursorPos}
+			/>);
 		}
 
 		return output;
@@ -273,7 +443,9 @@ class VisualEditor extends Component {
 			states.push(<g
 				key={state}
 				transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
-				onMouseDown={(e) => {this.startDragging(e, state)}}
+				onMouseDown={(e) => this.onMouseDownState(e, state)}
+				onMouseEnter={(e) => this.onMouseEnterState(e, state)}
+				onMouseLeave={(e) => this.onMouseLeaveState(e, state)}
 				className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.accept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}
 				draggable={false}
 				onDragStart={() => {return false;}}
@@ -332,9 +504,9 @@ class VisualEditor extends Component {
 					ref="svg"
 					width={this.width}
 					height={this.height}
-					onMouseMove={(e) => {this.maybeDrag(e)}}
-					onMouseLeave={() => {this.stopDragging()}}
-					onMouseUp={() => {this.stopDragging()}}
+					onMouseMove={(e) => {this.onMouseMove(e)}}
+					onMouseLeave={(e) => {this.onMouseLeave(e)}}
+					onMouseUp={(e) => {this.onMouseUp(e)}}
 				>
 					{this.renderTransitions()}
 					{states}

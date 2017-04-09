@@ -64,16 +64,16 @@ class LabelledArrow extends Component {
 			d += " A " + r + " " + r + " 0 1 1 " + end.x + " " + end.y;
 
 			// Angle normal to the arc
-			const normal = normalizeAngle(start.angleTo(end) + Math.PI / 2);
+			const normal = normalizeAngle(start.angleTo(end) - Math.PI / 2);
 
 			// For now, place the label so that it is guaranteed not to overlap with the shaft.
 			// But this is crude, we should calculate the actual "diameter" of the arc.
 			labelPos = perpendicularOffset(start, end, r * 2.2);
 
 			if (Math.abs(normal) > Math.PI / 2) {
-				labelAnchor = "start";
-			} else {
 				labelAnchor = "end";
+			} else {
+				labelAnchor = "start";
 			}
 
 			// Calculate the angle of the arrowhead ...

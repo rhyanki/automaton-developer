@@ -3,6 +3,10 @@ import ListEditor from './ListEditor/ListEditor.js';
 import VisualEditor from './VisualEditor/VisualEditor.js';
 import './NFAEditor.css';
 
+const _visualEditorInstructions = (<div>
+	<p>To create a new transition, right-click on a state and drag the mouse to another state.</p>
+</div>);
+
 class NFAEditor extends Component {
 	constructor(props) {
 		super(props);
@@ -73,6 +77,10 @@ class NFAEditor extends Component {
 		this.handle('removeTransition', ...arguments);
 	}
 
+	promptAddTransition(origin, target) {
+		this.promptUpdateTransitionSymbols(origin, target);
+	}
+
 	promptEditState(state) {
 		const newName = window.prompt("Enter a state name.", this.props.nfa.name(state));
 		if (newName) {
@@ -123,6 +131,7 @@ class NFAEditor extends Component {
 					<option value="visual">Visual Editor</option>
 				</select>
 				<br/>
+				{this.state.editor === 'visual' ? _visualEditorInstructions : null}
 				<button className="btn btn-default" onClick={() => this.addState()}>Add State</button>
 				<br/><br/>
 				<button
@@ -148,6 +157,7 @@ class NFAEditor extends Component {
 						nfa={this.state.nfa}
 						confirmRemoveState={this.confirmRemoveState}
 						confirmRemoveTransition={this.confirmRemoveTransition}
+						promptAddTransition={this.promptAddTransition}
 						promptEditState={this.promptEditState}
 						promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 						setStart={this.setStart}

@@ -79,3 +79,11 @@
 	fill: aquamarine;
 	cursor: pointer;
 }
+
+.VisualEditor .transition.editing .shaft {
+	stroke: red;
+}
+
+.VisualEditor .transition.editing .arrow:hover {
+	cursor: default;
+}
