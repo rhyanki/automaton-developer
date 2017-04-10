@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import NFAEditor from './NFAEditor/NFAEditor.js';
 import NFA from './Core/NFA.js';
 //import logo from './logo.svg';
@@ -6,7 +6,7 @@ import './App.css';
 
 const D1 = new NFA({
 	mutable: false,
-	alphabet: "abc",
+	//alphabet: "abc",
 	start: 1,
 	states: [
 		{name: "Start", transitions: [ // 1
@@ -33,7 +33,7 @@ const D1 = new NFA({
 	],
 });
 
-class App extends Component {
+class App extends Component<null, null> {
 	render() {
 		return (
 			<NFAEditor nfa={D1} />

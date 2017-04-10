@@ -1,14 +1,14 @@
-import {Set} from 'immutable';
+import {Map, Set} from 'immutable';
 
 const _allowedCharsRegex = /^[\x00-\x7Fε␣]*$/;
-const _backslashSymbols = new Map([
+const _backslashSymbols = Map([
 	["n", "\n"],
 	["r", "\r"],
 	["t", "\t"],
 	["f", "\f"],
 	["v", "\v"],
 ]);
-const _toBackslash = new Map([
+const _toBackslash = Map([
 	["~", "~"],
 	[",", ","],
 	["\\", "\\"],
@@ -26,12 +26,13 @@ const _toBackslash = new Map([
  *		a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
  */
 class SymbolGroup {
+	_symbols: Set<string>;
+	_normalized: string;
+
 	/**
 	 * Check whether a set of SymbolGroups share any symbols between them.
-	 * @param {Iterable<SymbolGroup>} symbolGroups
-	 * @returns {Boolean}
 	 */
-	static shareAny(symbolGroups) {
+	static shareAny(symbolGroups: Iterable<SymbolGroup>): boolean {
 		const allSymbols = Set().asMutable();
 		for (const group of symbolGroups) {
 			for (const symbol of group._symbols) {
@@ -45,9 +46,34 @@ class SymbolGroup {
 	}
 
 	/**
-	 * @param {String} input The input string, containing any ASCII characters or ε. Backslash codes (such as \n) and ranges (such as a-z) are allowed. ~ is an alias for ε (no symbol). All whitespace is stripped unless following a backslash.
+	 * Whether the SymbolGroup is empty (matches no symbols at all).
 	 */
-	constructor(input) {
+	get empty(): boolean {
+		return this._symbols.size === 0;
+	}
+
+	/**
+	 * Get the number of symbols in the group (including ε).
+	 */
+	get size(): number {
+		return this._symbols.size;
+	}
+
+	/**
+	 * Construct a new SymbolGroup based on an input string. If no input string, creates an empty SymbolGroup (matches nothing).
+	 * @param input  The input string, containing any ASCII characters or ε. Backslash codes (such as \n) and ranges (such as a-z) are allowed. ~ is an alias for ε (no symbol). All whitespace is stripped unless following a backslash.
+	 */
+	constructor(input?: string | SymbolGroup) {
+		if (!input) {
+			this._symbols = Set();
+			this._normalized = "";
+			return;
+		}
+
+		if (input instanceof SymbolGroup) {
+			return input;
+		}
+
 		this._symbols = Set().asMutable();
 
 		if (!_allowedCharsRegex.test(input)) {
@@ -78,10 +104,12 @@ class SymbolGroup {
 			// Try to match a character range
 			matches = input.match(/^(\\?[^,])-(\\?[^,])/);
 			if (matches) {
-				const rangeStart = this._parseSymbol(matches[1]);
-				const rangeEnd = this._parseSymbol(matches[2]);
-				for (let p = rangeStart.codePointAt(0); p <= rangeEnd.codePointAt(0); p++) {
-					this._symbols.add(String.fromCodePoint(p));
+				const rangeStart = this._parseSymbol(matches[1]).codePointAt(0);
+				const rangeEnd = this._parseSymbol(matches[2]).codePointAt(0);
+				if (rangeStart && rangeEnd) {
+					for (let p = rangeStart; p <= rangeEnd; p++) {
+						this._symbols.add(String.fromCodePoint(p));
+					}
 				}
 				input = input.substr(matches[0].length);
 				continue;
@@ -117,9 +145,8 @@ class SymbolGroup {
 
 	/**
 	 * Parse a raw input symbol (in the form of a backslash sequence, ~, or a normal character).
-	 * @param {String} input
 	 */
-	_parseSymbol(input) {
+	_parseSymbol(input: string): string {
 		if (input[0] === "\\") {
 			const afterBackslash = input.substr(1);
 			const backslashSymbol = _backslashSymbols.get(afterBackslash);
@@ -140,17 +167,18 @@ class SymbolGroup {
 
 	/**
 	 * Return whether this symbol group is equivalent to another symbol group (i.e. they match the same symbols).
-	 * @param {SymbolGroup} symbolGroup The symbol group.
 	 */
-	equals(symbolGroup) {
+	equals(symbolGroup: SymbolGroup | void): boolean {
+		if (!symbolGroup) {
+			return this._normalized === "";
+		}
 		return this._normalized === symbolGroup._normalized;
 	}
 
 	/**
 	 * Return whether or not the symbol group matches a given single symbol.
-	 * @param {String} symbol The symbol.
 	 */
-	matches(symbol) {
+	matches(symbol: string): boolean {
 		return this._symbols.has(symbol);
 	}
 
@@ -159,7 +187,7 @@ class SymbolGroup {
 	 * @param {SymbolGroup} other The other symbol group.
 	 * @returns {SymbolGroup} The new merged symbol group, or the current one if there was no change or the merge couldn't be done.
 	 */
-	merge(other) {
+	merge(other: SymbolGroup): SymbolGroup {
 		if (!(other instanceof SymbolGroup)) {
 			return this;
 		}
@@ -170,7 +198,7 @@ class SymbolGroup {
 		return newSymbols;
 	}
 
-	toString() {
+	toString(): string {
 		return this._normalized;
 	}
 }
