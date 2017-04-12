@@ -1,14 +1,14 @@
-//import {freeze} from '../Util/immutability.js';
 import {Map, Set} from 'immutable';
-import SymbolGroup from './SymbolGroup.js';
-import {shareAny} from '../Util/sets.js';
+import SymbolGroup from './SymbolGroup';
+import {shareAny} from '../Util/sets';
 
 /**
  * If mutable = true, update functions will directly modify the NFA and its elements (and theirs)
  * on which they are called, and return it.
  * Otherwise, they will create a minimal copy (maintaining as many references as possible) and return
  * the copy.
- * If not mutable, it is possible to do things like compare oldNFA.states === newNFA.states to see if any states have been added or removed.
+ * If not mutable, it is possible to do things like compare oldNFA.states === newNFA.states to see if
+ * any states have been added or removed.
  * 
  * There are a few ways to run the machine:
  * 1. nfa.accepts(input);
@@ -18,8 +18,8 @@ import {shareAny} from '../Util/sets.js';
  * nfa.result can be used to examine the result at any time.
  */
 
-type State = number;
-type NFATemplate = {
+export type State = number;
+export type NFATemplate = {
 	states: Iterable<{
 		name: string,
 		accept?: boolean,
@@ -28,34 +28,44 @@ type NFATemplate = {
 	start: State,
 	mutable?: boolean,
 };
-type Result = -1 | 0 | 1;
-type TransitionGroup = Map<State, SymbolGroup>;
-type TransitionMap = Map<State, TransitionGroup>;
+export type Result = -1 | 0 | 1;
+export type TransitionGroup = Map<State, SymbolGroup>;
+export type TransitionMap = Map<State, TransitionGroup>;
 
-class NFA {
-	_states: Set<State>; // Set of all states.
+export default class NFA {
+	_states: Set<State>;
 	_start: State;
-	_names: Map<State, string>; // Map of states to their names
-	_accept: Set<State>; // Set of accept states
+	_names: Map<State, string>;
+	_accept: Set<State>;
 	_transitions: TransitionMap;
 	_mutable: boolean;
-	_current?: Set<State>; // Set of current possible states while running (if DFA, this always contains at most one state)
-	_remaining?: string; // The current input buffer (string of symbols still left to step through)
-	_cache: { // Automatically generated
+
+	// Set of current possible states while running (if DFA, this always contains at most one state)
+	_current?: Set<State>;
+
+	// The current input buffer (string of symbols still left to step through)
+	_remaining?: string;
+
+	// Automatically generated
+	_cache: {
 		generatingStates?: Set<State>,
 		isDFA?: boolean,
 		reachableStates?: Set<State>,
 		result?: Result,
 	};
-	_shared: { // A single object shared by the NFA and all its copies
+
+	// A single object shared by the NFA and all its copies
+	_shared: {
 		nextID: number,
-	}
+	};
 	
 	constructor(template: NFA | NFATemplate, mutable?: boolean) {
 		// If this is a copy of an existing NFA ...
 		if (template instanceof NFA) {
 			for (var k in template) {
-				this[k] = template[k];
+				if (template.hasOwnProperty(k)) {
+					this[k] = template[k];
+				}
 			}
 			if (mutable === undefined) {
 				this._mutable = template._mutable;
@@ -195,7 +205,8 @@ class NFA {
 	}
 
 	/**
-	 * Get whether the NFA is also a DFA (i.e., each state has only one possible target state to which it can transition on a given symbol).
+	 * Get whether the NFA is also a DFA (i.e., each state has only one possible target state
+	 * to which it can transition on a given symbol).
 	 */
 	get isDFA(): boolean {
 		if (this._cache.isDFA === undefined || this._cache.isDFA === null) {
@@ -254,7 +265,10 @@ class NFA {
 	 * Get the result of the current run.
 	 * 0 if inconclusive (future input could result in accept), -1 if definite reject, 1 if accept.
 	 */
-	get result(): number {
+	get result(): Result {
+		if (!this._current) {
+			return 0;
+		}
 		if (this._cache.result === undefined || this._cache.result === null) {
 			if (shareAny([this._current, this._accept])) {
 				this._cache.result = 1;
@@ -404,8 +418,10 @@ class NFA {
 	}
 
 	/**
-	 * Return a shallow, mutable copy of this NFA (or itself it is already mutable). Also empties the cache, thus fully preparing it for modification.
-	 * It will be mutable, so it can have elements replaced if need be (but any previously immutable elements will remain so).
+	 * Return a shallow, mutable copy of this NFA (or itself it is already mutable).
+	 * Also empties the cache, thus fully preparing it for modification.
+	 * It will be mutable, so it can have elements replaced if need be
+	 * (but any previously immutable elements will remain so).
 	 * @param copyCache  Whether to copy/keep the cache from the old object.
 	 */
 	mutable(copyCache: boolean = false): NFA {
@@ -419,17 +435,19 @@ class NFA {
 		nfa._cache = {};
 		if (copyCache) {
 			for (const key in this._cache) {
-				nfa._cache[key] = this._cache[key];
+				if (this._cache.hasOwnProperty(key)) {
+					nfa._cache[key] = this._cache[key];
+				}
 			}
 		}
 		return nfa;
 	}
 
 	/**
-	 * Return the name of a state, or undefined if not a state.
+	 * Return the name of a state, or empty string if not a state.
 	 */
-	name(state: State): string | void {
-		return this._names.get(state);
+	name(state: State): string {
+		return this._names.get(state) || "";
 	}
 
 	/**
@@ -611,7 +629,7 @@ class NFA {
 	 * @param name  The new name.
 	 * @returns The new NFA.
 	 */
-	setName(state: State, name: string) {
+	setName(state: State, name: string): NFA {
 		state = this.state(state);
 		if (!state || this.name(state) === name) {
 			return this;
@@ -630,7 +648,7 @@ class NFA {
 	/**
 	 * Set a new start state.
 	 */
-	setStart(state: State) {
+	setStart(state: State): NFA {
 		state = this.state(state);
 		if (this.isStart(state)) {
 			return this;
@@ -652,12 +670,11 @@ class NFA {
 
 	/**
 	 * Set the symbols of a transition (creating the transition if it does not exist).
-	 * @param {Number} id ID of the origin state.
-	 * @param {Number} target ID of the target state.
-	 * @param {String|SymbolGroup} symbols The new symbol group.
-	 * @returns {NFA} The new NFA.
+	 * @param id  ID of the origin state.
+	 * @param target  ID of the target state.
+	 * @param symbols  The new symbol group.
 	 */
-	setTransition(origin: State, target: State, symbols: SymbolGroup) {
+	setTransition(origin: State, target: State, symbols: SymbolGroup | string): NFA {
 		origin = this.state(origin);
 		target = this.state(target);
 
@@ -814,5 +831,3 @@ class NFA {
 		return this._transitions.get(origin) || <TransitionGroup> Map();
 	}
 }
-
-export default NFA;

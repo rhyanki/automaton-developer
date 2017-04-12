@@ -1,13 +1,10 @@
+import {Set} from 'immutable';
+
 /**
  * Check whether any number of sets share any element.
- * @param {Iterable<Set>} sets
- * @returns {Boolean}
  */
-function shareAny(sets) {
-	if (sets.length < 2 || sets.size < 2) {
-		return false;
-	}
-	const union = new Set();
+export function shareAny(sets: Iterable<Set<any>>) {
+	const union = Set().asMutable();
 	for (const set of sets) {
 		for (const x of set) {
 			if (union.has(x)) {
@@ -18,5 +15,3 @@ function shareAny(sets) {
 	}
 	return false;
 }
-
-export {shareAny};

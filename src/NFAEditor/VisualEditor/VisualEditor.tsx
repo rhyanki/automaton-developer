@@ -1,27 +1,49 @@
-import React, {PureComponent} from 'react';
+import * as React from 'react';
+import NFA, {State} from '../../Core/NFA';
 import {Map} from 'immutable';
-import LabelledArrow from './LabelledArrow.js';
-import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math.js';
+import LabelledArrow from './LabelledArrow';
+import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
 import './VisualEditor.css';
 
-class VisualEditor extends PureComponent {
-	constructor(props) {
-		super(props);
+type CProps = {
+	nfa: NFA,
+	confirmRemoveState: (state: State) => any,
+	confirmRemoveTransition: (origin: State, target: State) => any,
+	promptAddTransition: (origin: State, target: State) => any,
+	promptEditState: (state: State) => any,
+	promptUpdateTransitionSymbols: (origin: State, target: State) => any,
+	setStart: (state: State) => any,
+	toggleAccept: (state: State) => any,
+};
+type CState = {
+	positions: Map<State, Vector>,
+	cursorPos: Vector,
+	draggingState: State,
+	drawingTransitionOrigin: State,
+	drawingTransitionTarget: State,
+	drawingTransitionSymbols?: string,
+};
 
-		this.width = 600; // Placeholders
-		this.height = 600;
+class VisualEditor extends React.PureComponent<CProps, CState> {
+	width: number = 600;
+	height: number = 600;
+	DEFAULT_POS: Vector;
+	STATE_RADIUS: number = 50;
+	NAME_SIZE: number = 14;
+	svg: SVGSVGElement;
+
+	constructor(props: CProps) {
+		super(props);
 
 		this.DEFAULT_POS = new Vector(this.width / 2, this.height / 2);
 
-		this.STATE_RADIUS = 50;
-		this.NAME_SIZE = 14;
-
 		this.state = {
-			positions: Map(),
-			cursorPos: null,
+			positions: Map() as Map<State, Vector>,
+			cursorPos: new Vector(-1, -1),
 			draggingState: 0,
 			drawingTransitionOrigin: 0,
 			drawingTransitionTarget: 0,
+			drawingTransitionSymbols: "",
 		};
 		Object.freeze(this.state);
 	}
@@ -32,10 +54,9 @@ class VisualEditor extends PureComponent {
 
 	componentDidUpdate() {
 		console.log("VisualEditor updated.");
-		//this.drawTransitions();
 	}
 
-	componentWillReceiveProps(nextProps) {
+	componentWillReceiveProps(nextProps: CProps) {
 		if (this.props.nfa.states === nextProps.nfa.states) {
 			return;
 		}
@@ -46,7 +67,7 @@ class VisualEditor extends PureComponent {
 				this.setState((prevState, prevProps) => {
 					return {
 						positions: prevState.positions.set(state, this.DEFAULT_POS)
-					}
+					};
 				});
 			}
 		}
@@ -54,10 +75,9 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Start dragging a state.
-	 * @param {Event} state
-	 * @param {Number} cursorPos The initial cursor position.
+	 * @param cursorPos  Initial cursor position.
 	 */
-	dragStateStart(state, cursorPos) {
+	dragStateStart(state: State, cursorPos: Vector) {
 		this.setState({
 			cursorPos: cursorPos,
 			draggingState: state,
@@ -66,17 +86,19 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Continue dragging the currently dragged state.
-	 * @param {Number} cursorPos
 	 */
-	dragStateContinue(cursorPos) {
+	dragStateContinue(cursorPos: Vector) {
 		if (!this.isDraggingState()) {
 			return;
 		}
 		// A state is being dragged
 		// Calculate the difference between the cursor's current and previous position, and move the state along that vector
 		this.setState((prevState, prevProps) => {
-			const diff = cursorPos.minus(prevState.cursorPos);
+			const diff = cursorPos.minus(prevState.cursorPos as Vector);
 			const oldPos = prevState.positions.get(prevState.draggingState);
+			if (!oldPos) {
+				return;
+			}
 			const newPos = oldPos.plus(diff);
 			return {
 				positions: prevState.positions.set(prevState.draggingState, newPos),
@@ -116,9 +138,9 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Continue drawing a transition.
-	 * @param {Number} cursorPos The current cursor position.
+	 * @param cursorPos  The current cursor position.
 	 */
-	drawTransitionContinue(cursorPos) {
+	drawTransitionContinue(cursorPos: Vector) {
 		if (!this.isDrawingTransition()) {
 			return;
 		}
@@ -127,10 +149,10 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Start drawing (or moving) a transition.
-	 * @param {Number} origin The origin state.
-	 * @param {Vector} cursorPos The initial cursor position.
+	 * @param origin  The origin state.
+	 * @param cursorPos  The initial cursor position.
 	 */
-	drawTransitionStart(origin, cursorPos) {
+	drawTransitionStart(origin: State, cursorPos: Vector) {
 		console.log("drawTransitionStart");
 		this.setState({
 			cursorPos: cursorPos,
@@ -141,9 +163,9 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Set a target for the transition being drawn.
-	 * @param {Number} target The new target (0 for no target).
+	 * @param target  The new target (0 for no target).
 	 */
-	drawTransitionSetTarget(target) {
+	drawTransitionSetTarget(target: State) {
 		if (!this.isDrawingTransition()) {
 			return;
 		}
@@ -152,18 +174,16 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Convert DOM coordinates to SVG coordinates.
-	 * @param {Number|Vector} x
-	 * @param {Number} [y]
 	 */
-	getSVGPoint(x, y) {
+	getSVGPoint(x: number | Vector, y?: number) {
 		if (x instanceof Vector) {
 			y = x.y;
 			x = x.x;
 		}
-		let point = this.refs.svg.createSVGPoint();
+		let point = this.svg.createSVGPoint();
 		point.x = x;
-		point.y = y;
-		point = point.matrixTransform(this.refs.svg.getScreenCTM().inverse());
+		point.y = y as number;
+		point = point.matrixTransform(this.svg.getScreenCTM().inverse());
 		return new Vector(point.x, point.y);
 	}
 
@@ -185,10 +205,8 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Event handler for when the mouse is pressed on a state.
-	 * @param {Event} e
-	 * @param {Number} state
 	 */
-	onMouseDownState(e, state) {
+	onMouseDownState(e: React.MouseEvent<any>, state: State) {
 		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
 		// If left-click, this is a state drag; if right-click, it's a transition drag
 		if (e.button === 0) {
@@ -200,10 +218,8 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Event handler for when the mouse enters a state.
-	 * @param {Event} e
-	 * @param {Number} state
 	 */
-	onMouseEnterState(e, state) {
+	onMouseEnterState(e: React.MouseEvent<any>, state: State) {
 		if (this.isDrawingTransition()) {
 			this.drawTransitionSetTarget(state);
 		}
@@ -226,9 +242,8 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Event handler for when the mouse moves on the editor.
-	 * @param {Event} e
 	 */
-	onMouseMove(e) {
+	onMouseMove(e: React.MouseEvent<any>) {
 		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
 		this.dragStateContinue(cursorPos);
 		this.drawTransitionContinue(cursorPos);
@@ -236,9 +251,8 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Event handler for when the mouse is released on the editor.
-	 * @param {Event} e
 	 */
-	onMouseUp(e) {
+	onMouseUp(e: React.MouseEvent<any>) {
 		if (e.button === 2) {
 			// Stop the context menu from appearing, if a right-click
 			e.preventDefault();
@@ -251,15 +265,15 @@ class VisualEditor extends PureComponent {
 	 * Set the positions of the states so that they are arranged in a circle around the center of the editor.
 	 */
 	resetPositions() {
-		this.setState((state, props) => {
+		this.setState((prevState: CState, prevProps: CProps) => {
 			const positions = Map().asMutable(); // Stores the positions of each state
-			const numStates = props.nfa.numStates;
+			const numStates = prevProps.nfa.numStates;
 
 			let angle = Math.PI; // The angle at which the next state should be placed
 			const offset = Math.min(this.width, this.height) * 0.3; // The distance each state should start from the centre
 			const direction = -1; // -1 for clockwise, 1 for anticlockwise
 
-			for (const state of props.nfa.states) {
+			for (const state of prevProps.nfa.states) {
 				const x = Math.round(this.width * 0.5 + Math.cos(angle) * offset);
 				const y = Math.round(this.height * 0.5 - Math.sin(angle) * offset);
 				positions.set(state, new Vector(x, y));
@@ -271,48 +285,43 @@ class VisualEditor extends PureComponent {
 
 	/**
 	 * Get the x-coordinate of a state.
-	 * @param {Number} state
-	 * @returns {Number}
 	 */
-	x(state) {
+	x(state: State): number {
 		return this.pos(state).x;
 	}
 
 	/**
 	 * Get the y-coordinate of a state.
-	 * @param {Number} state
-	 * @returns {Number}
 	 */
-	y(state) {
+	y(state: State): number {
 		return this.pos(state).y;
 	}
 
 	/**
-	 * Get the position of a state.
-	 * @param {Number} state
-	 * @returns {Vector}
+	 * Get the position of a state, default (-1, -1).
 	 */
-	pos(state) {
+	pos(state: State): Vector {
 		if (!this.state.positions.has(state)) {
 			return this.DEFAULT_POS;
 		}
-		return this.state.positions.get(state);
+		return this.state.positions.get(state) || new Vector(-1, -1);
 	}
 
 	/**
-	 * Return an array of SVG groups for all transitions from a state.
-	 * @returns {React.Element[]}
+	 * Return an array of all transitions from a state.
 	 */
 	renderTransitions() {
 		let nfa = this.props.nfa;
-		const output = [];
-		const angles = Map().asMutable(); // List of angles around the state's circle at which each transition arrow leaves
+		const output: JSX.Element[] = [];
+
+		// List of angles around the state's circle at which each transition arrow leaves
+		const angles = Map().asMutable() as Map<State, number[]>;
 
 		for (const state of nfa.states) {
-			angles.set(state, []);
-		};
+			angles.set(state, [] as number[]);
+		}
 
-		// If a transition is being drawn or moved, this overrides the NFA's actual transitions as far as rendering is concerned
+		// If a transition is being drawn or moved, this overrides the NFA's actual transitions
 		if (this.isDrawingTransition()) {
 			const origin = this.state.drawingTransitionOrigin;
 			const target = this.state.drawingTransitionTarget;
@@ -324,7 +333,7 @@ class VisualEditor extends PureComponent {
 		// Render interstate transitions
 		for (const origin of nfa.states) {
 			const originPos = this.pos(origin);
-			for (const [target,] of nfa.transitionsFrom(origin)) {
+			for (const [target, ] of nfa.transitionsFrom(origin)) {
 				if (origin === target) {
 					// Will need to make special case for self-connections
 					continue;
@@ -352,26 +361,28 @@ class VisualEditor extends PureComponent {
 				// Push the angle around the state circle from which the transition arrow protrudes
 				if (nfa.hasTransition(origin, origin)) {
 					const originIntersectPos = quadraticCurveAt(originPos, control, targetPos, 1 - t);
-					angles.get(origin).push(originPos.angleTo(originIntersectPos));
+					(angles.get(origin) as number[]).push(originPos.angleTo(originIntersectPos));
 				}
 
 				// And the angle at which it enters the target
 				if (nfa.hasTransition(target, target)) {
 					const targetIntersectPos = quadraticCurveAt(originPos, control, targetPos, t);
-					angles.get(target).push(targetPos.angleTo(targetIntersectPos));
+					(angles.get(target) as number[]).push(targetPos.angleTo(targetIntersectPos));
 				}
 
-				output.push(<LabelledArrow
-					key={[origin, target]}
-					className="transition"
-					start={originPos}
-					control={control}
-					end={targetPos}
-					label={nfa.symbolsString(origin, target)}
-					arrowHeadT={t}
-					onClickShaft={() => this.props.confirmRemoveTransition(origin, target)}
-					onClickLabel={() => this.props.promptUpdateTransitionSymbols(origin, target)}
-				/>);
+				output.push(
+					<LabelledArrow
+						key={origin + "-" + target}
+						className="transition"
+						start={originPos}
+						control={control}
+						end={targetPos}
+						label={nfa.symbolsString(origin, target)}
+						arrowHeadT={t}
+						onClickShaft={() => this.props.confirmRemoveTransition(origin, target)}
+						onClickLabel={() => this.props.promptUpdateTransitionSymbols(origin, target)}
+					/>
+				);
 			}
 		}
 
@@ -379,7 +390,7 @@ class VisualEditor extends PureComponent {
 		for (const state of nfa.states) {
 			if (nfa.hasTransition(state, state)) {
 				const pos = this.pos(state);
-				let angs = angles.get(state);
+				let angs = angles.get(state) as number[];
 
 				let angle;
 
@@ -410,27 +421,31 @@ class VisualEditor extends PureComponent {
 				const start = pos.plus(new Vector(this.STATE_RADIUS, aStart, true));
 				const end = pos.plus(new Vector(this.STATE_RADIUS, aEnd, true));
 
-				output.push(<LabelledArrow
-					key={[state, state]}
-					className="transition"
-					start={start}
-					end={end}
-					radius={r}
-					label={nfa.symbolsString(state, state)}
-					onClickShaft={() => this.props.confirmRemoveTransition(state, state)}
-					onClickLabel={() => this.props.promptUpdateTransitionSymbols(state, state)}
-				/>);
+				output.push(
+					<LabelledArrow
+						key={state + "-" + state}
+						className="transition"
+						start={start}
+						end={end}
+						radius={r}
+						label={nfa.symbolsString(state, state)}
+						onClickShaft={() => this.props.confirmRemoveTransition(state, state)}
+						onClickLabel={() => this.props.promptUpdateTransitionSymbols(state, state)}
+					/>
+				);
 			}
 		}
 
 		// Render transition currently being drawn
 		if (this.state.drawingTransitionOrigin && !this.state.drawingTransitionTarget) {
-			output.push(<LabelledArrow
-				key="DRAWING"
-				className="transition editing"
-				start={this.pos(this.state.drawingTransitionOrigin)}
-				end={this.state.cursorPos}
-			/>);
+			output.push((
+				<LabelledArrow
+					key="DRAWING"
+					className="transition editing"
+					start={this.pos(this.state.drawingTransitionOrigin)}
+					end={this.state.cursorPos}
+				/>
+			));
 		}
 
 		return output;
@@ -440,73 +455,80 @@ class VisualEditor extends PureComponent {
 		const states = [];
 		const nfa = this.props.nfa;
 		for (const state of nfa.states) {
-			states.push(<g
-				key={state}
-				transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
-				onMouseDown={(e) => this.onMouseDownState(e, state)}
-				onMouseEnter={(e) => this.onMouseEnterState(e, state)}
-				onMouseLeave={(e) => this.onMouseLeaveState(e, state)}
-				className={'state ' + (!nfa.reachable(state) ? 'state-unreachable ' : '') + (nfa.isAccept(state) ? 'state-accept ' : '') + (!nfa.generating(state) ? 'state-nongenerating ' : '')}
-				draggable={false}
-				onDragStart={() => {return false;}}
-			>
-				<circle
-					name={state}
-					style={{stroke: "black", strokeWidth: 1}}
-					r={this.STATE_RADIUS}
-				/>
-				<foreignObject
-					x={-0.5 * this.STATE_RADIUS}
-					y={-0.8 * this.STATE_RADIUS}
-					width={this.STATE_RADIUS}
-					height={this.STATE_RADIUS * 0.5}
+			states.push((
+				<g
+					key={state}
+					transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
+					onMouseDown={(e) => this.onMouseDownState(e, state)}
+					onMouseEnter={(e) => this.onMouseEnterState(e, state)}
+					onMouseLeave={(e) => this.onMouseLeaveState()}
+					className={'state '
+						+ (!nfa.reachable(state) ? 'state-unreachable ' : '')
+						+ (nfa.isAccept(state) ? 'state-accept ' : '')
+						+ (!nfa.generating(state) ? 'state-nongenerating ' : ''
+					)}
+					onDragStart={() => false}
 				>
-					<i
-						className={"fa fa-flag-checkered" + (!nfa.isStart(state) ? " btn-edit-state" : "")}
-						title={!nfa.isStart(state) ? "Set as start" : null}
-						onClick={() => {if (!nfa.isStart(state)) this.props.setStart(state); }}
-					></i>
-				</foreignObject>
-				<foreignObject
-					x={-0.5 * this.STATE_RADIUS}
-					y={0.4 * this.STATE_RADIUS}
-					width={this.STATE_RADIUS}
-					height={this.STATE_RADIUS * 0.5}
-				>
-					<i
-						className="fa fa-pencil btn-edit-state"
-						title="Edit name"
-						onClick={() => this.props.promptEditState(state)}
-					></i>
-					<i
-						className="fa fa-remove btn-edit-state"
-						title="Delete"
-						onClick={() => this.props.confirmRemoveState(state)}
-					></i>
-					<i
-						className="fa fa-check btn-edit-state"
-						title={nfa.isAccept(state) ? "Remove accept state" : "Make accept state"}
-						onClick={() => this.props.toggleAccept(state)}
-					></i>
-				</foreignObject>
-				<text
-					fontFamily="Verdana"
-					x={0}
-					y={0}
-					textAnchor="middle"
-				>{nfa.name(state)}</text>
-			</g>);
+					<circle
+						name={state.toString()}
+						style={{stroke: "black", strokeWidth: 1}}
+						r={this.STATE_RADIUS}
+					/>
+					<foreignObject
+						x={-0.5 * this.STATE_RADIUS}
+						y={-0.8 * this.STATE_RADIUS}
+						width={this.STATE_RADIUS}
+						height={this.STATE_RADIUS * 0.5}
+					>
+						<i
+							className={"fa fa-flag-checkered" + (!nfa.isStart(state) ? " btn-edit-state" : "")}
+							title={!nfa.isStart(state) ? "Set as start" : undefined}
+							onClick={() => {if (!nfa.isStart(state)) { this.props.setStart(state); } }}
+						/>
+					</foreignObject>
+					<foreignObject
+						x={-0.5 * this.STATE_RADIUS}
+						y={0.4 * this.STATE_RADIUS}
+						width={this.STATE_RADIUS}
+						height={this.STATE_RADIUS * 0.5}
+					>
+						<i
+							className="fa fa-pencil btn-edit-state"
+							title="Edit name"
+							onClick={() => this.props.promptEditState(state)}
+						/>
+						<i
+							className="fa fa-remove btn-edit-state"
+							title="Delete"
+							onClick={() => this.props.confirmRemoveState(state)}
+						/>
+						<i
+							className="fa fa-check btn-edit-state"
+							title={nfa.isAccept(state) ? "Remove accept state" : "Make accept state"}
+							onClick={() => this.props.toggleAccept(state)}
+						/>
+					</foreignObject>
+					<text
+						fontFamily="Verdana"
+						x={0}
+						y={0}
+						textAnchor="middle"
+					>
+						{nfa.name(state)}
+					</text>
+				</g>
+			));
 		}
 
 		return (
 			<div className="VisualEditor">
 				<svg
-					ref="svg"
+					ref={(svg) => this.svg = svg}
 					width={this.width}
 					height={this.height}
-					onMouseMove={(e) => {this.onMouseMove(e)}}
-					onMouseLeave={(e) => {this.onMouseLeave(e)}}
-					onMouseUp={(e) => {this.onMouseUp(e)}}
+					onMouseMove={(e) => this.onMouseMove(e)}
+					onMouseLeave={(e) => this.onMouseLeave()}
+					onMouseUp={(e) => this.onMouseUp(e)}
 				>
 					{this.renderTransitions()}
 					{states}

@@ -1,36 +1,32 @@
-import React, {Component} from 'react';
-import {Vector, normalizeAngle, perpendicularOffset, quadraticCurveAt} from '../../Util/math.js';
-import {defaults} from '../../Util/general.js';
+import * as React from 'react';
+import {Vector, normalizeAngle, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
+import {defaults} from '../../Util/general';
+
+type CProps = {
+	start: Vector,		// The start position.
+	end: Vector,		// The end position.
+	control?: Vector,	// The control point (defaults to the midpoint of start and end - i.e., a straight line).
+	radius?: number,	// If provided, the arrow will be an arc from start to end with the given radius.
+	arrowHeadT?: number,	// The t value (t from 0 to 1) at which to draw the arrowhead.
+	label?: string,		// The label text.
+	onClickShaft?: React.EventHandler<React.MouseEvent<any>>, // Handler for when the shaft is clicked.
+	onClickLabel?: React.EventHandler<React.MouseEvent<any>>, // Handler for when the label is clicked.
+	className?: string,	// The classname for the main <g>.
+};
 
 /**
  * Renders a labelled, directed, clickable, arrow between two points, with the label rendered in the centre.
- * The arrow may be a straight line, a quadratic curve (if control provided), or an arc (if )
- * <Arrow
- * 		{Vector} start - The start position.
- * 		{Vector} end - The end position.
- * 		{Vector} [control] - The control point (defaults to the midpoint of start and end - i.e., a straight line).
- * 		{Number} [radius] - If provided, the arrow will be an arc from start to end with the given radius.
- * 		{Number} [arrowHeadT = 1] - The t value (t from 0 to 1) at which to draw the arrowhead.
- * 		{String} [label = ""] - The label text.
- * 		{Function} [onClickShaft] - Handler for when the shaft is clicked.
- * 		{Function} [onClickLabel] - Handler for when the label is clicked.
- * 		{String} [className = "LabelledArrow"] - The classname for the main <g>.
- * />
+ * The arrow may be a straight line, a quadratic curve (if control provided), or an arc (if radius provided).
  */
-class LabelledArrow extends Component {
+class LabelledArrow extends React.PureComponent<CProps, null> {
 	/**
 	 * Return a polyline consisting of two short lines in the shape of an arrowhead.
-	 * @param {Vector} pos The position of the tip of the arrow.
-	 * @param {Number} angle The angle at which the arrow is pointing. 0 = left, π/2 = down.
-	 * @param {Number} [size = 10] The length of each line.
-	 * @param {Number} [theta = π/3] The angle between the arrow's lines. Should be less than π.
+	 * @param pos  The position of the tip of the arrow.
+	 * @param angle  The angle at which the arrow is pointing. 0 = left, π/2 = down.
+	 * @param size  The length of each line.
+	 * @param theta  The angle between the arrow's lines. Should be less than π.
 	 */
-	renderArrowHead(pos, angle, size, theta) {
-		if (size === undefined)
-			size = 10;
-		if (theta === undefined)
-			theta = Math.PI / 3;
-
+	renderArrowHead(pos: Vector, angle: number, size: number = 10, theta: number = Math.PI / 3) {
 		const t1 = angle - theta / 2;
 		const t2 = angle + theta / 2;
 
@@ -38,18 +34,20 @@ class LabelledArrow extends Component {
 		points += " " + pos.x + "," + pos.y;
 		points += " " + (pos.x - size * Math.cos(t2)) + "," + (pos.y - size * Math.sin(t2));
 
-		return <polyline className="head" points={points} />
+		return (<polyline className="head" points={points} />);
 	}
 
 	render() {
 		const start = this.props.start;
 		const end = this.props.end;
-		const props = defaults(this.props, {
+
+		const def = {
 			control: Vector.midpoint(start, end),
 			arrowHeadT: 1,
 			label: "",
 			className: "LabelledArrow",
-		}, false);
+		};
+		const props = defaults(this.props, def, false);
 
 		// The SVG string to draw the curve
 		let d = "M" + start.x + " " + start.y;
@@ -79,7 +77,8 @@ class LabelledArrow extends Component {
 			// Calculate the angle of the arrowhead ...
 			// Basically, we know the two arc points, and the radius.
 			// Draw a triangle between the two arc points and the arc center, and call the two equal angles theta.
-			// Then theta we can see is perpendicular to the gradient of the arc at the end point (assuming the triangle's base is along the x-axis).
+			// Then theta we can see is perpendicular to the gradient of the arc at the end point
+			// (assuming the triangle's base is along the x-axis).
 			// Then just add the angle of the normal to compensate.
 			// Let d = d between arc points, then
 			// 2 r cos θ = d
@@ -109,21 +108,27 @@ class LabelledArrow extends Component {
 			arrowHead = this.renderArrowHead(arrowHeadPos, angle); // TODO: make the angle more accurate
 		}
 
-		return (<g
-			className={props.className}
-		>
-			<g className="arrow">
-				<path className="shaft" d={d} onClick={props.onClickShaft} />
-				{arrowHead}
+		return (
+			<g
+				className={props.className}
+			>
+				<g className="arrow">
+					<path className="shaft" d={d} onClick={props.onClickShaft} />
+					{arrowHead}
+				</g>
+				{props.label ? (
+					<text
+						className="label"
+						x={labelPos.x}
+						y={labelPos.y + 5}
+						textAnchor={labelAnchor}
+						onClick={props.onClickLabel}
+					>
+						{props.label}
+					</text>
+				) : null}
 			</g>
-			{props.label ? (<text
-				className="label"
-				x={labelPos.x}
-				y={labelPos.y + 5}
-				textAnchor={labelAnchor}
-				onClick={props.onClickLabel}
-			>{props.label}</text>) : null}
-		</g>)
+		);
 	}
 }
 

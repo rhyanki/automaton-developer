@@ -22,8 +22,8 @@ const _toBackslash = Map([
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
  * The following special codes are allowed:
- *		~: represents ε (no symbol)
- *		a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
+ *     ~: represents ε (no symbol)
+ *     a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
  */
 class SymbolGroup {
 	_symbols: Set<string>;
@@ -60,11 +60,15 @@ class SymbolGroup {
 	}
 
 	/**
-	 * Construct a new SymbolGroup based on an input string. If no input string, creates an empty SymbolGroup (matches nothing).
-	 * @param input  The input string, containing any ASCII characters or ε. Backslash codes (such as \n) and ranges (such as a-z) are allowed. ~ is an alias for ε (no symbol). All whitespace is stripped unless following a backslash.
+	 * Construct a new SymbolGroup based on an input string.
+	 * If no input string, creates an empty SymbolGroup (matches nothing).
+	 * @param input  The input string, containing any ASCII characters or ε.
+	 * - Backslash codes (such as \n) and ranges (such as a-z) are allowed.
+	 * - ~ is an alias for ε (no symbol).
+	 * - All whitespace is stripped unless following a backslash.
 	 */
 	constructor(input?: string | SymbolGroup) {
-		if (!input) {
+		if (input === undefined) {
 			this._symbols = Set();
 			this._normalized = "";
 			return;
@@ -185,7 +189,7 @@ class SymbolGroup {
 	/**
 	 * Merge the symbol group with another.
 	 * @param {SymbolGroup} other The other symbol group.
-	 * @returns {SymbolGroup} The new merged symbol group, or the current one if there was no change or the merge couldn't be done.
+	 * @returns {SymbolGroup} The new merged symbol group, or the current one if no change.
 	 */
 	merge(other: SymbolGroup): SymbolGroup {
 		if (!(other instanceof SymbolGroup)) {
