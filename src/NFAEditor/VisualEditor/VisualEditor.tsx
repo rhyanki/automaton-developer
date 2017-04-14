@@ -332,6 +332,17 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 			}
 		}
 
+		const getClassName = (origin: State, target: State) => {
+			let className = "transition";
+			if (nfa.hasFollowed(origin, target)) {
+				className += " followed";
+			}
+			if (nfa.justFollowed(origin, target)) {
+				className += " just-followed";
+			}
+			return className;
+		};
+
 		// Render interstate transitions
 		for (const origin of nfa.states) {
 			const originPos = this.pos(origin);
@@ -375,7 +386,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 				output.push(
 					<LabelledArrow
 						key={origin + "-" + target}
-						className="transition"
+						className={getClassName(origin, target)}
 						start={originPos}
 						control={control}
 						end={targetPos}
@@ -426,7 +437,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 				output.push(
 					<LabelledArrow
 						key={state + "-" + state}
-						className="transition"
+						className={getClassName(state, state)}
 						start={start}
 						end={end}
 						radius={r}

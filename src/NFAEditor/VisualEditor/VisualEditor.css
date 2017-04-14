@@ -47,6 +47,10 @@
 }
 
 .VisualEditor .transition.followed .arrow .shaft {
+	stroke: orange;
+}
+
+.VisualEditor .transition.just-followed .arrow .shaft {
 	stroke: red;
 }
 

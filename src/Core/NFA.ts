@@ -1,4 +1,4 @@
-import {Map, Set} from 'immutable';
+import {Map, Set, isImmutable} from 'immutable';
 import SymbolGroup from './SymbolGroup';
 import {shareAny} from '../Util/sets';
 
@@ -78,7 +78,7 @@ export default class NFA {
 					this[k] = template[k];
 				}
 			}
-			this._mutable = mutable || template._mutable;
+			this._mutable = mutable || template._mutable || false;
 			this._cache = {}; // All new NFAs get a new cache
 			if (!this._mutable) {
 				if (template._mutable) {
@@ -129,7 +129,7 @@ export default class NFA {
 		this._start = this.state(template.start);
 
 		// If mutable param is given, that will be used; otherwise, template.mutable is used; otherwise, immutable by default.
-		mutable = mutable || template.mutable;
+		mutable = mutable || template.mutable || false;
 		if (!mutable) {
 			this.immutable();
 		}
@@ -140,9 +140,8 @@ export default class NFA {
 	 * @param state  The state to start from. If it has been visited already, _explore() will do nothing.
 	 * @param visited  The set of visited states. Must be mutable (and will be modified).
 	 * @param backwards  Whether to go backwards (so states that transition TO the given state will be explored instead).
-	 * @param symbol  If provided, only transitions on this symbol will be followed.
 	 */
-	_explore(state: State, visited: Set<State>, backwards?: boolean, symbol?: string): Set<State> {
+	_explore(state: State, visited: Set<State>, backwards?: boolean): Set<State> {
 		backwards = backwards || false;
 		if (visited.has(state)) {
 			return visited;
@@ -150,31 +149,41 @@ export default class NFA {
 		visited.add(state);
 		if (backwards) {
 			for (const origin of this._states) {
-				if (this.hasTransition(origin, state, symbol)) {
-					this._explore(origin, visited, backwards, symbol);
+				if (this.hasTransition(origin, state)) {
+					this._explore(origin, visited, backwards);
 				}
 			}
 		} else {
-			for (const [target, symbols] of this.transitionsFrom(state)) {
-				if (symbol !== undefined && !symbols.matches(symbol)) {
-					continue;
-				}
-				this._explore(target, visited, backwards, symbol);
+			for (const [target, ] of this.transitionsFrom(state)) {
+				this._explore(target, visited, backwards);
 			}
 		}
 		return visited;
 	}
 
 	/**
-	 * Given a set of states, add any states reachable via empty transitions.
-	 * @param states  The set of current states. Must be mutable.
+	 * Add any states reachable via empty transitions from the current states.
+	 * NFA must be mutable.
 	 */
-	_followEmptyTransitions(states: Set<State>): Set<State> {
-		for (const state of states) {
-			states.remove(state); // So that explore() doesn't end immediately
-			this._explore(state, states, false, "");
+	_followEmptyTransitions(onlyFrom?: State): void {
+		if (!this.isRunning || !this._mutable) {
+			return;
 		}
-		return states;
+		let origins;
+		if (!onlyFrom) {
+			origins = this.currentStates;
+		} else {
+			origins = [onlyFrom];
+		}
+		for (const origin of origins) {
+			for (const [target, symbols] of this.transitionsFrom(origin)) {
+				if (symbols.matches("")) {
+					this.currentStates.add(target);
+					(this._followedTransitions as Map<string, number>).set(origin + "-" + target, this.numRead);
+					this._followEmptyTransitions(target);
+				}
+			}
+		}
 	}
 
 	/**
@@ -368,7 +377,6 @@ export default class NFA {
 		if (!this._mutable) {
 			nfa.immutable();
 		}
-
 		return nfa;
 	}
 
@@ -378,6 +386,16 @@ export default class NFA {
 	 */
 	generating(state: State): boolean {
 		return this.generatingStates.has(this.state(state));
+	}
+
+	/**
+	 * Return whether the NFA has followed a given transition this run.
+	 */
+	hasFollowed(origin: State, target: State): boolean {
+		if (!this._followedTransitions) {
+			return false;
+		}
+		return this._followedTransitions.has(origin + "-" + target);
 	}
 
 	/**
@@ -409,23 +427,30 @@ export default class NFA {
 	/**
 	 * Make this NFA (deeply) immutable, preventing any further changes from ever being made to it or its constituents.
 	 */
-	immutable(): this {
+	immutable(): NFA {
 		if (!this._mutable) {
 			return this;
 		}
 		this._mutable = false;
-		for (const transitions of this._transitions.values()) {
-			transitions.asImmutable();
+
+		// Note that there is currently a bug in immutable.js which seems to sometimes make asImmutable() return a new object
+		// rather than the original, leaving the original mutable.
+
+		if (!isImmutable(this._transitions)) {
+			const allTransitions = this._transitions as TransitionMap;
+			for (const [origin, transitions] of allTransitions) {
+				allTransitions.set(origin, transitions.asImmutable());
+			}
+			this._transitions = allTransitions.asImmutable();
 		}
-		this._accept.asImmutable();
-		this._states.asImmutable();
-		this._names.asImmutable();
-		this._transitions.asImmutable();
+		this._accept = this._accept.asImmutable();
+		this._states = this._states.asImmutable();
+		this._names = this._names.asImmutable();
 		if (this._current) {
-			this._current.asImmutable();
+			this._current = this._current.asImmutable();
 		}
 		if (this._followedTransitions) {
-			this._followedTransitions.asImmutable();
+			this._followedTransitions = this._followedTransitions.asImmutable();
 		}
 		Object.freeze(this);
 		return this;
@@ -451,6 +476,16 @@ export default class NFA {
 	isStart(state: State): boolean {
 		state = this.state(state);
 		return !!state && this._start === state;
+	}
+
+	/**
+	 * Return whether the NFA just followed a given transition on the previous symbol.
+	 */
+	justFollowed(origin: State, target: State): boolean {
+		if (!this._followedTransitions) {
+			return false;
+		}
+		return this._followedTransitions.get(origin + "-" + target) === this.numRead;
 	}
 
 	/**
@@ -567,11 +602,11 @@ export default class NFA {
 		const nfa = this.mutable(true);
 		delete nfa._cache.result;
 
-		nfa._current = Set().asMutable().add(this.start);
-		nfa._current = nfa._followEmptyTransitions(nfa._current);
-		nfa._remainingInput = input;
 		nfa._numRead = 0;
+		nfa._remainingInput = input;
 		nfa._followedTransitions = Map().asMutable() as Map<string, number>;
+		nfa._current = Set().asMutable().add(this.start);
+		nfa._followEmptyTransitions();
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -647,10 +682,8 @@ export default class NFA {
 		nfa._cache.isDFA = cache.isDFA;
 
 		if (!this._mutable) {
-			console.log("Making immutable again");
 			nfa.immutable();
 		}
-
 		return nfa;
 	}
 
@@ -662,7 +695,6 @@ export default class NFA {
 			return this;
 		}
 		const nfa = this.mutable(true);
-		delete nfa._cache.result;
 
 		nfa._remainingInput = input;
 		if (!this._mutable) {
@@ -683,7 +715,7 @@ export default class NFA {
 			return this;
 		}
 
-		const nfa = this.mutable();
+		const nfa = this.mutable(true);
 		nfa._names = nfa._names.asMutable().set(state, name);
 
 		if (!this._mutable) {
@@ -755,6 +787,11 @@ export default class NFA {
 			nfa._cache.reachableStates = cache.reachableStates;
 		}
 
+		if (nfa.isRunning && symbols.matches("") && nfa.isCurrentState(origin)) {
+			nfa._current = nfa.currentStates.asMutable();
+			nfa._followEmptyTransitions(origin);
+		}
+
 		if (!this._mutable) {
 			nfa.immutable();
 		}
@@ -815,12 +852,14 @@ export default class NFA {
 		const nfa = this.mutable(true);
 		delete nfa._cache.result;
 
+		nfa._followedTransitions = (nfa._followedTransitions as Map<string, number>).asMutable();
+
 		// Get the next symbol; for now, assume no combining characters
 		const symbol = nfa.remainingInput[0];
 		nfa._remainingInput = nfa.remainingInput.substr(1);
 
-		if (this._numRead) {
-			this._numRead++;
+		if (nfa._numRead !== undefined) {
+			nfa._numRead++;
 		}
 
 		// Follow each applicable transition from each of the current states
@@ -829,13 +868,14 @@ export default class NFA {
 			for (const [target, symbols] of nfa.transitionsFrom(origin)) {
 				if (symbols.matches(symbol)) {
 					newStates.add(target);
+					nfa._followedTransitions.set(origin + "-" + target, nfa.numRead);
 				}
 			}
 		}
 
 		// And follow all empty transitions from the resultant states
-		nfa._followEmptyTransitions(newStates);
 		nfa._current = newStates;
+		nfa._followEmptyTransitions();
 
 		if (!this._mutable) {
 			nfa.immutable();
