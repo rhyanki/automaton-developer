@@ -1,10 +1,10 @@
 import * as React from 'react';
 import NFAEditor from './NFAEditor/NFAEditor';
-import NFA from './Core/NFA';
+import RunnableNFA from './Core/RunnableNFA';
 // import logo from './logo.svg';
 import './App.css';
 
-const D1 = new NFA({
+const D1 = new RunnableNFA({
 	mutable: false,
 	start: 1,
 	states: [

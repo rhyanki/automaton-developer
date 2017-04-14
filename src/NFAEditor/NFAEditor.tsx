@@ -1,5 +1,5 @@
 import * as React from 'react';
-import NFA, {State} from '../Core/NFA';
+import RunnableNFA, {State} from '../Core/RunnableNFA';
 import {List} from 'immutable';
 import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
@@ -12,16 +12,16 @@ const _visualEditorInstructions = (
 );
 
 type CProps = {
-	nfa: NFA
+	nfa: RunnableNFA
 };
 type CState = {
 	editor: string,
-	nfa: NFA,
+	nfa: RunnableNFA,
 	inputs: List<string>,
 };
 
 export default class NFAEditor extends React.PureComponent<CProps, CState> {
-	prevNFAs: NFA[];
+	prevNFAs: RunnableNFA[];
 
 	constructor(props: CProps) {
 		super(props);
@@ -79,7 +79,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	back() {
 		if (this.prevNFAs.length > 0) {
 			this.setState({
-				nfa: this.prevNFAs.pop() as NFA,
+				nfa: this.prevNFAs.pop() as RunnableNFA,
 			});
 		}
 	}
@@ -146,7 +146,6 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	switchEditor(editor: string) {
-		console.log(editor);
 		this.setState({editor: editor});
 	}
 

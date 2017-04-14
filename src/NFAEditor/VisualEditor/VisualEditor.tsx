@@ -1,12 +1,12 @@
 import * as React from 'react';
-import NFA, {State} from '../../Core/NFA';
+import RunnableNFA, {State} from '../../Core/RunnableNFA';
 import {Map} from 'immutable';
 import LabelledArrow from './LabelledArrow';
 import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
 import './VisualEditor.css';
 
 type CProps = {
-	nfa: NFA,
+	nfa: RunnableNFA,
 	confirmRemoveState: (state: State) => any,
 	confirmRemoveTransition: (origin: State, target: State) => any,
 	promptAddTransition: (origin: State, target: State) => any,
