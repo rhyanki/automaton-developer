@@ -475,7 +475,7 @@ export default class NFA {
 			nfa._accept = nfa._accept.delete(state);
 		}
 
-		nfa._cache.generatingStates = cache.generatingStates;
+		nfa._cache.reachableStates = cache.reachableStates;
 		nfa._cache.isDFA = cache.isDFA;
 
 		if (!this._mutable) {

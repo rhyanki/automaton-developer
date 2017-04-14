@@ -62,7 +62,9 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 			}
 			try {
 				const newNFA = prevState.nfa[methodName](...args);
-				this.history.push(prevState.nfa);
+				if (newNFA !== prevState.nfa) {
+					this.history.push(prevState.nfa);
+				}
 				return {
 					nfa: newNFA,
 				};
