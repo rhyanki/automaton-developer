@@ -12,7 +12,12 @@ type CProps = {
 	promptAddTransition: (origin: State, target: State) => any,
 	promptEditState: (state: State) => any,
 	promptUpdateTransitionSymbols: (origin: State, target: State) => any,
+	reset: () => any,
+	run: () => any,
+	setInput: (input: string) => any,
 	setStart: (state: State) => any,
+	step: () => any,
+	stop: () => any,
 	toggleAccept: (state: State) => any,
 };
 type CState = {
@@ -25,7 +30,7 @@ type CState = {
 };
 
 class VisualEditor extends React.PureComponent<CProps, CState> {
-	width: number = 600;
+	width: number = 700;
 	height: number = 600;
 	DEFAULT_POS: Vector;
 	STATE_RADIUS: number = 50;
@@ -118,7 +123,6 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	 * Cancel drawing the current transition.
 	 */
 	drawTransitionCancel() {
-		console.log("drawTransitionCancel");
 		this.setState({drawingTransitionOrigin: 0, drawingTransitionTarget: 0});
 	}
 
@@ -129,7 +133,6 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		if (!this.isDrawingTransition()) {
 			return;
 		}
-		console.log("drawTransitionComplete");
 		if (this.state.drawingTransitionOrigin && this.state.drawingTransitionTarget) {
 			this.props.promptAddTransition(this.state.drawingTransitionOrigin, this.state.drawingTransitionTarget);
 		}
@@ -153,7 +156,6 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	 * @param cursorPos  The initial cursor position.
 	 */
 	drawTransitionStart(origin: State, cursorPos: Vector) {
-		console.log("drawTransitionStart");
 		this.setState({
 			cursorPos: cursorPos,
 			drawingTransitionOrigin: origin,
@@ -462,11 +464,12 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 					onMouseDown={(e) => this.onMouseDownState(e, state)}
 					onMouseEnter={(e) => this.onMouseEnterState(e, state)}
 					onMouseLeave={(e) => this.onMouseLeaveState()}
-					className={'state '
-						+ (!nfa.reachable(state) ? 'state-unreachable ' : '')
-						+ (nfa.isAccept(state) ? 'state-accept ' : '')
-						+ (!nfa.generating(state) ? 'state-nongenerating ' : ''
-					)}
+					className={'state'
+						+ (!nfa.reachable(state) ? ' unreachable' : '')
+						+ (nfa.isAccept(state) ? ' accept' : '')
+						+ (!nfa.generating(state) ? ' nongenerating' : '')
+						+ (nfa.isCurrentState(state) ? ' current' : '')
+					}
 					onDragStart={() => false}
 				>
 					<circle
@@ -530,6 +533,22 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 					onMouseLeave={(e) => this.onMouseLeave()}
 					onMouseUp={(e) => this.onMouseUp(e)}
 				>
+					<foreignObject
+						x={20}
+						y={20}
+						width={200}
+						height={50}
+					>
+						<button onClick={this.props.reset}>Reset</button>
+						<button onClick={this.props.run}>Run</button>
+						<button onClick={this.props.step}>Step</button>
+						<button onClick={this.props.stop}>Stop</button>
+						<input
+							type="text"
+							value={nfa.remainingInput}
+							onChange={(e) => this.props.setInput(e.target.value)}
+						/>
+					</foreignObject>
 					{this.renderTransitions()}
 					{states}
 				</svg>

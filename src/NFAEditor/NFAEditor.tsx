@@ -1,5 +1,6 @@
 import * as React from 'react';
 import NFA, {State} from '../Core/NFA';
+import {List} from 'immutable';
 import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
 import './NFAEditor.css';
@@ -15,16 +16,25 @@ type CProps = {
 };
 type CState = {
 	editor: string,
-	nfa: NFA
+	nfa: NFA,
+	inputs: List<string>,
 };
 
 export default class NFAEditor extends React.PureComponent<CProps, CState> {
+	prevNFAs: NFA[];
+
 	constructor(props: CProps) {
 		super(props);
+
+		this.prevNFAs = [];
+
 		this.state = {
 			editor: 'visual',
-			nfa: this.props.nfa
+			nfa: this.props.nfa,
+			inputs: List(),
 		};
+
+		(window as any).nfa = this.state.nfa; // For debugging
 
 		// Bind all methods to this
 		for (const methodName of Object.getOwnPropertyNames(this.constructor.prototype)) {
@@ -34,8 +44,10 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		}
 	}
 
-	componentDidUpdate() {
+	componentDidUpdate(prevProps: CProps, prevState: CState) {
+		this.prevNFAs.push(prevState.nfa);
 		console.log("NFAEditor updated.");
+		(window as any).nfa = this.state.nfa; // For debugging
 	}
 
 	/**
@@ -62,6 +74,14 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 
 	addState(name?: string) {
 		this.handle('addState', name);
+	}
+
+	back() {
+		if (this.prevNFAs.length > 0) {
+			this.setState({
+				nfa: this.prevNFAs.pop() as NFA,
+			});
+		}
 	}
 
 	confirmRemoveState(state: State) {
@@ -97,12 +117,32 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('setTransition', origin, target, symbols);
 	}
 
-	setStart(state: State) {
-		this.handle('setStart', ...arguments);
+	reset() {
+		this.handle('reset');
+	}
+
+	run() {
+		this.handle('run');
+	}
+
+	setInput(input: string) {
+		this.handle('setInput', ...arguments);
 	}
 
 	setName(state: State, name: string) {
 		this.handle('setName', ...arguments);
+	}
+
+	setStart(state: State) {
+		this.handle('setStart', ...arguments);
+	}
+
+	step() {
+		this.handle('step');
+	}
+
+	stop() {
+		this.handle('stop');
 	}
 
 	switchEditor(editor: string) {
@@ -126,10 +166,11 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 
 	render() {
 		const nfa = this.state.nfa;
+		const editor = this.state.editor;
 		return ((
 			<div className="row">
 				<div className="col-md-4">
-					<select className="form-control" value={this.state.editor} onChange={(e) => this.switchEditor(e.target.value)}>
+					<select className="form-control" value={editor} onChange={(e) => this.switchEditor(e.target.value)}>
 						<option value="list">List Editor</option>
 						<option value="visual">Visual Editor</option>
 					</select>
@@ -143,12 +184,18 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 					</button>
 					<br/>
 					<br/>
-					<button className="btn btn-default" onClick={() => console.log(this.state.nfa)}>Log NFA to console</button>
+					<label>Input will be {nfa.willAccept ? 'accepted' : 'rejected'}.</label>
+					<input
+						type="text"
+						className="form-control"
+						value={nfa.remainingInput}
+						onChange={(e) => this.setInput(e.target.value)}
+					/>
 				</div>
 				<div className="col-md-8">
-					<div style={{display: (this.state.editor === 'list') ? 'block' : 'none'}}>
+					<div style={{display: (editor === 'list') ? 'block' : 'none'}}>
 						<ListEditor
-							nfa={this.state.nfa}
+							nfa={nfa}
 							promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
 							setStart={this.setStart}
 							setName={this.setName}
@@ -156,15 +203,20 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 							updateTransitionTarget={this.updateTransitionTarget}
 						/>
 					</div>
-					<div style={{display: (this.state.editor === 'visual') ? 'block' : 'none'}}>
+					<div style={{display: (editor === 'visual') ? 'block' : 'none'}}>
 						<VisualEditor
-							nfa={this.state.nfa}
+							nfa={nfa}
 							confirmRemoveState={this.confirmRemoveState}
 							confirmRemoveTransition={this.confirmRemoveTransition}
 							promptAddTransition={this.promptAddTransition}
 							promptEditState={this.promptEditState}
 							promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
+							reset={this.reset}
+							run={this.run}
+							setInput={this.setInput}
 							setStart={this.setStart}
+							step={this.step}
+							stop={this.stop}
 							toggleAccept={this.toggleAccept}
 						/>
 					</div>

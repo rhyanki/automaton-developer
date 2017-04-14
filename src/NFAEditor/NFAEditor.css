@@ -3,17 +3,32 @@
 	fill: #eee;
 }
 
-.state-accept {
-	background-color: #9f9;
-	fill: #9f9;
+.state.current {
+	background-color: #fc0;
+	fill: #fc0;
 }
 
-.state-nongenerating {
-	background-color: #f99;
-	fill: #f99;
+.state.accept {
+	background-color: #bfb;
+	fill: #bfb;
 }
 
-.state-unreachable {
+.state.accept.current {
+	background-color: #6f6;
+	fill: #6f6;
+}
+
+.state.nongenerating {
+	background-color: #fbb;
+	fill: #fbb;
+}
+
+.state.nongenerating.current {
+	background-color: #f66;
+	fill: #f66;
+}
+
+.state.unreachable {
 	background-color: #ff9;
 	fill: #ff9;
 }

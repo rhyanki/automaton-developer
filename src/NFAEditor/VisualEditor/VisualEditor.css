@@ -1,8 +1,15 @@
 .VisualEditor {
 	border-style: solid;
 	border-width: 1px;
+	border-color: black;
 	position: relative;
 	text-align: center;
+}
+
+.VisualEditor svg {
+	border-style: solid;
+	border-width: 1px;
+	border-color: red;
 }
 
 .VisualEditor .state {
@@ -18,22 +25,6 @@
 .VisualEditor .state text {
 	fill: black;
 	font-size: 10pt;
-}
-
-.VisualEditor .state rect {
-	fill: #eee;
-}
-
-.VisualEditor .state-accept rect {
-	fill: #9f9;
-}
-
-.VisualEditor .state-nongenerating rect {
-	fill: #f99;
-}
-
-.VisualEditor .state-unreachable rect {
-	fill: #ff9;
 }
 
 .VisualEditor .state .btn-edit-state {
@@ -53,6 +44,10 @@
 	fill: none;
 	stroke: blue;
 	stroke-width: 3;
+}
+
+.VisualEditor .transition.followed .arrow .shaft {
+	stroke: red;
 }
 
 .VisualEditor .transition .arrow .head {
