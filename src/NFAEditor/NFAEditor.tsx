@@ -17,21 +17,21 @@ type CProps = {
 type CState = {
 	editor: string,
 	nfa: RunnableNFA,
-	inputs: List<string>,
+	testInputs: List<string>,
 };
 
 export default class NFAEditor extends React.PureComponent<CProps, CState> {
-	prevNFAs: RunnableNFA[];
+	history: RunnableNFA[];
 
 	constructor(props: CProps) {
 		super(props);
 
-		this.prevNFAs = [];
+		this.history = [];
 
 		this.state = {
 			editor: 'visual',
 			nfa: this.props.nfa,
-			inputs: List(),
+			testInputs: List([""]),
 		};
 
 		(window as any).nfa = this.state.nfa; // For debugging
@@ -45,15 +45,14 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	componentDidUpdate(prevProps: CProps, prevState: CState) {
-		this.prevNFAs.push(prevState.nfa);
 		console.log("NFAEditor updated.");
 		(window as any).nfa = this.state.nfa; // For debugging
 	}
 
 	/**
 	 * Update the NFAEditor's state with a new NFA, based on the result of calling one of the NFA's methods.
-	 * @param {String} methodName The name of the NFA method to call.
-	 * @param {*} args The args to pass to the NFA method call.
+	 * @param methodName The name of the NFA method to call.
+	 * @param args The args to pass to the NFA method call.
 	 */
 	handle(methodName: string, ...args: any[]): void {
 		this.setState((prevState, props) => {
@@ -62,8 +61,10 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 				throw new Error(methodName + " is not a valid NFA method!");
 			}
 			try {
+				const newNFA = prevState.nfa[methodName](...args);
+				this.history.push(prevState.nfa);
 				return {
-					nfa: prevState.nfa[methodName](...args)
+					nfa: newNFA,
 				};
 			} catch (e) {
 				window.alert(e.message);
@@ -76,12 +77,20 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('addState', name);
 	}
 
+	addTestInput() {
+		this.setState({
+			testInputs: this.state.testInputs.push(""),
+		});
+	}
+
 	back() {
-		if (this.prevNFAs.length > 0) {
-			this.setState({
-				nfa: this.prevNFAs.pop() as RunnableNFA,
-			});
-		}
+		this.undo();
+	}
+
+	clearTestInputs() {
+		this.setState({
+			testInputs: List(),
+		});
 	}
 
 	confirmRemoveState(state: State) {
@@ -117,8 +126,8 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('setTransition', origin, target, symbols);
 	}
 
-	reset() {
-		this.handle('reset');
+	reset(input: string = "") {
+		this.handle('reset', input);
 	}
 
 	run() {
@@ -137,6 +146,12 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('setStart', ...arguments);
 	}
 
+	setTestInput(index: number, input: string) {
+		this.setState({
+			testInputs: this.state.testInputs.set(index, input),
+		});
+	}
+
 	step() {
 		this.handle('step');
 	}
@@ -153,6 +168,14 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('toggleAccept', ...arguments);
 	}
 
+	undo() {
+		if (this.history.length > 0) {
+			this.setState({
+				nfa: this.history.pop() as RunnableNFA,
+			});
+		}
+	}
+
 	updateTransitionTarget(origin: State, oldTarget: State, newTarget: State) {
 		if (this.state.nfa.hasTransition(origin, newTarget)) {
 			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions.\
@@ -166,9 +189,38 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	render() {
 		const nfa = this.state.nfa;
 		const editor = this.state.editor;
+		const testInputs = [];
+		let i = 0;
+		for (const input of this.state.testInputs) {
+			const index = i;
+			const accepts = nfa.accepts(input);
+			testInputs.push(
+				<tr key={index}>
+					<td>
+						<span
+							className={"test-input-result glyphicon glyphicon-" + (accepts ? "ok" : "remove")
+								+ (accepts ? " accept" : " reject")}
+							title={accepts ? "Accepted" : "Rejected"}
+						/>
+					</td>
+					<td>
+						<input
+							type="text"
+							className="form-control"
+							value={input}
+							onChange={(e) => this.setTestInput(index, e.target.value)}
+						/>
+					</td>
+					<td>
+						<button className="btn btn-default" onClick={() => this.reset(input)}>Visualize</button>
+					</td>
+				</tr>
+			);
+			i++;
+		}
 		return ((
 			<div className="row">
-				<div className="col-md-4">
+				<div className="col-md-3">
 					<select className="form-control" value={editor} onChange={(e) => this.switchEditor(e.target.value)}>
 						<option value="list">List Editor</option>
 						<option value="visual">Visual Editor</option>
@@ -183,15 +235,18 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 					</button>
 					<br/>
 					<br/>
-					<label>Input will be {nfa.willAccept ? 'accepted' : 'rejected'}.</label>
-					<input
-						type="text"
-						className="form-control"
-						value={nfa.remainingInput}
-						onChange={(e) => this.setInput(e.target.value)}
-					/>
+					<label>Test inputs</label>
+					<button className="btn btn-default" onClick={() => this.addTestInput()}>Add</button>
+					<button className="btn btn-default" onClick={() => this.clearTestInputs()}>Clear</button>
+					<div className="input-box">
+						<table className="table">
+							<tbody>
+								{testInputs}
+							</tbody>
+						</table>
+					</div>
 				</div>
-				<div className="col-md-8">
+				<div className="col-md-9">
 					<div style={{display: (editor === 'list') ? 'block' : 'none'}}>
 						<ListEditor
 							nfa={nfa}
@@ -205,6 +260,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 					<div style={{display: (editor === 'visual') ? 'block' : 'none'}}>
 						<VisualEditor
 							nfa={nfa}
+							back={this.back}
 							confirmRemoveState={this.confirmRemoveState}
 							confirmRemoveTransition={this.confirmRemoveTransition}
 							promptAddTransition={this.promptAddTransition}

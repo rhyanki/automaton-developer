@@ -7,6 +7,7 @@ import './VisualEditor.css';
 
 type CProps = {
 	nfa: RunnableNFA,
+	back: () => any,
 	confirmRemoveState: (state: State) => any,
 	confirmRemoveTransition: (origin: State, target: State) => any,
 	promptAddTransition: (origin: State, target: State) => any,
@@ -30,8 +31,8 @@ type CState = {
 };
 
 class VisualEditor extends React.PureComponent<CProps, CState> {
-	width: number = 700;
-	height: number = 600;
+	width: number = 820;
+	height: number = 700;
 	DEFAULT_POS: Vector;
 	STATE_RADIUS: number = 50;
 	NAME_SIZE: number = 14;
@@ -547,15 +548,18 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 					<foreignObject
 						x={20}
 						y={20}
-						width={200}
-						height={50}
+						width={250}
+						height={80}
 					>
-						<button onClick={this.props.reset}>Reset</button>
-						<button onClick={this.props.run}>Run</button>
-						<button onClick={this.props.step}>Step</button>
-						<button onClick={this.props.stop}>Stop</button>
+						{!nfa.isRunning
+							? (<button className="btn btn-default" onClick={() => this.props.reset()}>Start</button>)
+							: (<button className="btn btn-default" onClick={() => this.props.stop()}>Stop</button>)}
+						<button className="btn btn-default" onClick={() => this.props.run()}>Run</button>
+						<button className="btn btn-default" onClick={() => this.props.step()}>Step</button>
+						<button className="btn btn-default" onClick={() => this.props.back()}>Undo</button>
 						<input
 							type="text"
+							className="form-control"
 							value={nfa.remainingInput}
 							onChange={(e) => this.props.setInput(e.target.value)}
 						/>

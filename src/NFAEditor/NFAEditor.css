@@ -1,3 +1,16 @@
+.input-box {
+	height: 400px;
+	overflow-y: scroll;
+}
+
+.test-input-result.accept {
+	color: #6f6;
+}
+
+.test-input-result.reject {
+	color: #f66;
+}
+
 .state {
 	background-color: #eee;
 	fill: #eee;
