@@ -1,24 +1,34 @@
 import * as React from 'react';
 import RunnableNFA, {State} from '../Core/RunnableNFA';
-import {List} from 'immutable';
+import {List, OrderedMap} from 'immutable';
 import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
+import TestInputEditor from './TestInputEditor';
 import './NFAEditor.css';
 
-const _visualEditorInstructions = (
-	<div>
-		<p>To create a new transition, right-click on a state and drag the mouse to another state.</p>
-	</div>
-);
+const _editors = OrderedMap([
+	['visual', "Visual Editor"],
+	['list', "List Editor"]],
+) as OrderedMap<EditorType, string>;
+
+const _tabs = OrderedMap([
+	['instructions', "Instructions"],
+	['test', "Test Inputs"],
+	['presets', "Presets"],
+	['convert', "Convert"],
+]) as OrderedMap<Tab, string>;
 
 type CProps = {
 	nfa: RunnableNFA
 };
 type CState = {
-	editor: string,
 	nfa: RunnableNFA,
+	editor: EditorType,
+	tab: Tab,
 	testInputs: List<string>,
 };
+type EditorType = 'visual' | 'list';
+type Tab = 'test' | 'presets' | 'instructions' | 'convert';
 
 export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	history: RunnableNFA[];
@@ -29,8 +39,9 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.history = [];
 
 		this.state = {
-			editor: 'visual',
 			nfa: this.props.nfa,
+			editor: 'visual',
+			tab: 'instructions',
 			testInputs: List([""]),
 		};
 
@@ -79,20 +90,8 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('addState', name);
 	}
 
-	addTestInput() {
-		this.setState({
-			testInputs: this.state.testInputs.push(""),
-		});
-	}
-
 	back() {
 		this.undo();
-	}
-
-	clearTestInputs() {
-		this.setState({
-			testInputs: List(),
-		});
 	}
 
 	confirmRemoveState(state: State) {
@@ -107,6 +106,15 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 			return;
 		}
 		this.handle('removeTransition', ...arguments);
+	}
+
+	/**
+	 * Simple wrapper to set the style of a react element as display: block or display: none.
+	 */
+	displayIf(condition: boolean): React.CSSProperties {
+		return {
+			display: (condition ? 'block' : 'none')
+		}
 	}
 
 	promptAddTransition(origin: State, target: State) {
@@ -128,7 +136,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('setTransition', origin, target, symbols);
 	}
 
-	reset(input: string = "") {
+	reset(input?: string) {
 		this.handle('reset', input);
 	}
 
@@ -148,12 +156,6 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('setStart', ...arguments);
 	}
 
-	setTestInput(index: number, input: string) {
-		this.setState({
-			testInputs: this.state.testInputs.set(index, input),
-		});
-	}
-
 	step() {
 		this.handle('step');
 	}
@@ -162,8 +164,12 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.handle('stop');
 	}
 
-	switchEditor(editor: string) {
+	switchEditor(editor: EditorType) {
 		this.setState({editor: editor});
+	}
+
+	switchTab(tab: Tab) {
+		this.setState({tab: tab});
 	}
 
 	toggleAccept(state: State) {
@@ -191,65 +197,71 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	render() {
 		const nfa = this.state.nfa;
 		const editor = this.state.editor;
-		const testInputs = [];
-		let i = 0;
-		for (const input of this.state.testInputs) {
-			const index = i;
-			const accepts = nfa.accepts(input);
-			testInputs.push(
-				<tr key={index}>
-					<td>
-						<span
-							className={"test-input-result glyphicon glyphicon-" + (accepts ? "ok" : "remove")
-								+ (accepts ? " accept" : " reject")}
-							title={accepts ? "Accepted" : "Rejected"}
-						/>
-					</td>
-					<td>
-						<input
-							type="text"
-							className="form-control"
-							value={input}
-							onChange={(e) => this.setTestInput(index, e.target.value)}
-						/>
-					</td>
-					<td>
-						<button className="btn btn-default" onClick={() => this.reset(input)}>Visualize</button>
-					</td>
-				</tr>
-			);
-			i++;
-		}
 		return ((
 			<div className="row">
 				<div className="col-md-3">
-					<select className="form-control" value={editor} onChange={(e) => this.switchEditor(e.target.value)}>
-						<option value="list">List Editor</option>
-						<option value="visual">Visual Editor</option>
+					<select
+						className="form-control"
+						value={editor}
+						onChange={(e) => this.switchEditor(e.target.value as EditorType)}
+					>
+						{_editors.map((name, key) => (
+							<option key={key} value={key}>{name}</option>
+						))}
 					</select>
 					<br/>
-					{this.state.editor === 'visual' ? _visualEditorInstructions : null}
 					<button className="btn btn-default" onClick={() => this.addState()}>Add State</button>
 					<br/>
 					<br/>
-					<button className="btn btn-default" disabled={nfa.isDFA}>
-						{nfa.isDFA ? "Already a DFA" : "Convert to DFA"}
-					</button>
+					<ul className="nav nav-pills">
+						{_tabs.map((name, key) => (
+							<li
+								key={key}
+								role="presentation"
+								onClick={() => this.switchTab(key)}
+								className={this.state.tab === key ? "active" : ""}
+							>
+								<a href="#">{name}</a>
+							</li>
+						))}
+					</ul>
 					<br/>
-					<br/>
-					<label>Test inputs</label>
-					<button className="btn btn-default" onClick={() => this.addTestInput()}>Add</button>
-					<button className="btn btn-default" onClick={() => this.clearTestInputs()}>Clear</button>
-					<div className="input-box">
-						<table className="table">
-							<tbody>
-								{testInputs}
-							</tbody>
-						</table>
+					<div style={this.displayIf(this.state.tab === 'test')}>
+						<TestInputEditor
+							nfa={nfa}
+							runOnInput={(input) => this.reset(input)}
+						/>
+					</div>
+					<div style={this.displayIf(this.state.tab === 'instructions')}>
+						<label>Editing symbols</label>
+						<p>Click the symbols of a transition to edit them.</p>
+						<p>
+							Enter a comma-separated list of characters (symbols) to transition on.
+							Currently, only ASCII symbols are supported.
+						</p>
+						<p>
+							Common backslash sequences are recognized (\n, \\, etc.).
+							You can also use a backslash before a space or a comma.
+						</p>
+						<p>
+							Character ranges (e.g. a-z) are supported.
+						</p>
+						<label>Editing transitions in the visual editor</label>
+						<p>
+							To create a new transition, right-click on a state and drag the mouse to another state.
+						</p>
+						<p>
+							To delete a transition, just click on its arrow shaft.
+						</p>
+					</div>
+					<div style={this.displayIf(this.state.tab === 'convert')}>
+						<button className="btn btn-default" disabled={nfa.isDFA} title={nfa.isDFA ? "Your NFA is already a DFA." : ""}>
+							Convert to DFA
+						</button>
 					</div>
 				</div>
 				<div className="col-md-9">
-					<div style={{display: (editor === 'list') ? 'block' : 'none'}}>
+					<div style={this.displayIf(editor === 'list')}>
 						<ListEditor
 							nfa={nfa}
 							promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
@@ -259,7 +271,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 							updateTransitionTarget={this.updateTransitionTarget}
 						/>
 					</div>
-					<div style={{display: (editor === 'visual') ? 'block' : 'none'}}>
+					<div style={this.displayIf(editor === 'visual')}>
 						<VisualEditor
 							nfa={nfa}
 							back={this.back}

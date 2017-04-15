@@ -539,8 +539,8 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 			<div className="VisualEditor">
 				<svg
 					ref={(svg) => this.svg = svg}
-					width={this.width}
-					height={this.height}
+					width="100%"
+					height="100%"
 					onMouseMove={(e) => this.onMouseMove(e)}
 					onMouseLeave={(e) => this.onMouseLeave()}
 					onMouseUp={(e) => this.onMouseUp(e)}

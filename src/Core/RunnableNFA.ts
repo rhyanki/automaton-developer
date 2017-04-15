@@ -119,7 +119,7 @@ export default class RunnableNFA extends NFA {
 	 * Does not mutate the NFA, even if it is mutable.
 	 */
 	accepts(input: string): boolean {
-		return this.mutableCopy().reset().run(input).result === 1;
+		return this.mutableCopy().reset(input).run().result === 1;
 	}
 
 	/**
@@ -161,13 +161,15 @@ export default class RunnableNFA extends NFA {
 
 	/**
 	 * Set up the NFA to be run, resetting to the start state and erasing the input buffer.
-	 * @param input  The (initial) input to add to the input buffer.
+	 * @param input  The (initial) input to add to the input buffer. If empty, will keep the previous input.
 	 */
-	reset(input: string = ""): this {
+	reset(input?: string): this {
 		const nfa = this.mutable(true);
 
 		nfa._numRead = 0;
-		nfa._remainingInput = input;
+		if (input !== undefined) {
+			nfa._remainingInput = input;
+		}
 		nfa._followedTransitions = Map().asMutable() as Map<string, number>;
 		nfa._current = Set().asMutable().add(this.start);
 		nfa._followEmptyTransitions();
@@ -223,7 +225,7 @@ export default class RunnableNFA extends NFA {
 	 * Set the NFA's remaining input.
 	 */
 	setInput(input: string): this {
-		if (!this.isRunning || input === this._remainingInput) {
+		if (input === this._remainingInput) {
 			return this;
 		}
 		const nfa = this.mutable(true);
@@ -293,7 +295,7 @@ export default class RunnableNFA extends NFA {
 	}
 
 	/**
-	 * Stop running the NFA.
+	 * Stop running the NFA and erase the remaining input.
 	 * @returns {NFA}
 	 */
 	stop(): this {
@@ -305,7 +307,6 @@ export default class RunnableNFA extends NFA {
 		nfa._current = Set().asMutable();
 		nfa._followedTransitions = Map().asMutable() as Map<string, number>;
 		nfa._numRead = -1;
-		nfa._remainingInput = "";
 
 		if (!this._mutable) {
 			nfa.immutable();
