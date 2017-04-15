@@ -1,0 +1,4 @@
+.TestInputEditor .input-box {
+	height: 400px;
+	overflow-y: scroll;
+}

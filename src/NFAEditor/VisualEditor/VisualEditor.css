@@ -5,7 +5,7 @@
 	position: relative;
 	text-align: center;
 	width: 100%;
-	height: 90vh;
+	height: 100%;
 }
 
 .VisualEditor svg {
@@ -13,34 +13,6 @@
 	border-width: 1px;
 	border-color: red;
 	align-content: center;
-}
-
-.VisualEditor .state {
-	cursor: move;
-	user-drag: none;
-	user-select: none;
-	-moz-user-select: none;
-	-webkit-user-drag: none;
-	-webkit-user-select: none;
-	-ms-user-select: none;
-}
-
-.VisualEditor .state text {
-	fill: black;
-	font-size: 10pt;
-}
-
-.VisualEditor .state .btn-edit-state {
-	display: none;
-}
-
-.VisualEditor .state:hover .btn-edit-state {
-	display: inline;
-}
-
-.VisualEditor .btn-edit-state:hover {
-	background-color: aquamarine;
-	cursor: pointer;
 }
 
 .VisualEditor .transition .arrow .shaft {

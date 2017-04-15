@@ -1,0 +1,27 @@
+.VisualState {
+	cursor: move;
+	user-drag: none;
+	user-select: none;
+	-moz-user-select: none;
+	-webkit-user-drag: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+}
+
+.VisualState text {
+	fill: black;
+	font-size: 10pt;
+}
+
+.VisualState .btn-edit {
+	display: none;
+}
+
+.VisualState:hover .btn-edit {
+	display: inline;
+}
+
+.VisualState .btn-edit:hover {
+	background-color: aquamarine;
+	cursor: pointer;
+}

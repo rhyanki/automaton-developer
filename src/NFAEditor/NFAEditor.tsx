@@ -3,7 +3,8 @@ import RunnableNFA, {State} from '../Core/RunnableNFA';
 import {List, OrderedMap} from 'immutable';
 import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
-import TestInputEditor from './TestInputEditor';
+import TestInputEditor from './TestInputEditor/TestInputEditor';
+import ControlPanel from './ControlPanel/ControlPanel';
 import './NFAEditor.css';
 
 const _editors = OrderedMap([
@@ -94,6 +95,21 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.undo();
 	}
 
+	/**
+	 * Clear the editor, replacing the NFA with a blank one.
+	 */
+	clear() {
+		this.setState({
+			nfa: new RunnableNFA({
+				start: 0,
+				states: [{
+					name: "Start",
+					transitions: [],
+				}],
+			})
+		});
+	}
+
 	confirmRemoveState(state: State) {
 		if (!window.confirm("Are you sure you want to delete this state?")) {
 			return;
@@ -113,8 +129,8 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	 */
 	displayIf(condition: boolean): React.CSSProperties {
 		return {
-			display: (condition ? 'block' : 'none')
-		}
+			display: (condition ? 'block' : 'none'),
+		};
 	}
 
 	promptAddTransition(origin: State, target: State) {
@@ -210,9 +226,6 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 						))}
 					</select>
 					<br/>
-					<button className="btn btn-default" onClick={() => this.addState()}>Add State</button>
-					<br/>
-					<br/>
 					<ul className="nav nav-pills">
 						{_tabs.map((name, key) => (
 							<li
@@ -261,7 +274,21 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 					</div>
 				</div>
 				<div className="col-md-9">
-					<div style={this.displayIf(editor === 'list')}>
+					<div>
+						<ControlPanel
+							nfa={nfa}
+							addState={this.addState}
+							back={this.back}
+							clear={this.clear}
+							reset={this.reset}
+							run={this.run}
+							setInput={this.setInput}
+							step={this.step}
+							stop={this.stop}
+						/>
+					</div>
+					<br/>
+					<div className="editor" style={this.displayIf(editor === 'list')}>
 						<ListEditor
 							nfa={nfa}
 							promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
@@ -271,21 +298,15 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 							updateTransitionTarget={this.updateTransitionTarget}
 						/>
 					</div>
-					<div style={this.displayIf(editor === 'visual')}>
+					<div className="editor" style={this.displayIf(editor === 'visual')}>
 						<VisualEditor
 							nfa={nfa}
-							back={this.back}
 							confirmRemoveState={this.confirmRemoveState}
 							confirmRemoveTransition={this.confirmRemoveTransition}
 							promptAddTransition={this.promptAddTransition}
 							promptEditState={this.promptEditState}
 							promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
-							reset={this.reset}
-							run={this.run}
-							setInput={this.setInput}
 							setStart={this.setStart}
-							step={this.step}
-							stop={this.stop}
 							toggleAccept={this.toggleAccept}
 						/>
 					</div>

@@ -1,24 +1,19 @@
 import * as React from 'react';
 import RunnableNFA, {State} from '../../Core/RunnableNFA';
 import {Map} from 'immutable';
-import LabelledArrow from './LabelledArrow';
 import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
+import VisualState from './VisualState/VisualState';
+import LabelledArrow from './LabelledArrow';
 import './VisualEditor.css';
 
 type CProps = {
 	nfa: RunnableNFA,
-	back: () => any,
 	confirmRemoveState: (state: State) => any,
 	confirmRemoveTransition: (origin: State, target: State) => any,
 	promptAddTransition: (origin: State, target: State) => any,
 	promptEditState: (state: State) => any,
 	promptUpdateTransitionSymbols: (origin: State, target: State) => any,
-	reset: () => any,
-	run: () => any,
-	setInput: (input: string) => any,
 	setStart: (state: State) => any,
-	step: () => any,
-	stop: () => any,
 	toggleAccept: (state: State) => any,
 };
 type CState = {
@@ -32,7 +27,7 @@ type CState = {
 
 class VisualEditor extends React.PureComponent<CProps, CState> {
 	width: number = 820;
-	height: number = 700;
+	height: number = 650;
 	DEFAULT_POS: Vector;
 	STATE_RADIUS: number = 50;
 	NAME_SIZE: number = 14;
@@ -466,75 +461,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	render() {
-		const states = [];
 		const nfa = this.props.nfa;
-		for (const state of nfa.states) {
-			states.push((
-				<g
-					key={state}
-					transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
-					onMouseDown={(e) => this.onMouseDownState(e, state)}
-					onMouseEnter={(e) => this.onMouseEnterState(e, state)}
-					onMouseLeave={(e) => this.onMouseLeaveState()}
-					className={'state'
-						+ (!nfa.reachable(state) ? ' unreachable' : '')
-						+ (nfa.isAccept(state) ? ' accept' : '')
-						+ (!nfa.generating(state) ? ' nongenerating' : '')
-						+ (nfa.isCurrentState(state) ? ' current' : '')
-					}
-					onDragStart={() => false}
-				>
-					<circle
-						name={state.toString()}
-						style={{stroke: "black", strokeWidth: 1}}
-						r={this.STATE_RADIUS}
-					/>
-					<foreignObject
-						x={-0.5 * this.STATE_RADIUS}
-						y={-0.8 * this.STATE_RADIUS}
-						width={this.STATE_RADIUS}
-						height={this.STATE_RADIUS * 0.5}
-					>
-						<i
-							className={"fa fa-flag-checkered" + (!nfa.isStart(state) ? " btn-edit-state" : "")}
-							title={!nfa.isStart(state) ? "Set as start" : undefined}
-							onClick={() => {if (!nfa.isStart(state)) { this.props.setStart(state); } }}
-						/>
-					</foreignObject>
-					<foreignObject
-						x={-0.5 * this.STATE_RADIUS}
-						y={0.4 * this.STATE_RADIUS}
-						width={this.STATE_RADIUS}
-						height={this.STATE_RADIUS * 0.5}
-					>
-						<i
-							className="fa fa-pencil btn-edit-state"
-							title="Edit name"
-							onClick={() => this.props.promptEditState(state)}
-						/>
-						<i
-							className="fa fa-remove btn-edit-state"
-							title="Delete"
-							onClick={() => this.props.confirmRemoveState(state)}
-						/>
-						<i
-							className="fa fa-check btn-edit-state"
-							title={nfa.isAccept(state) ? "Remove accept state" : "Make accept state"}
-							onClick={() => this.props.toggleAccept(state)}
-						/>
-					</foreignObject>
-					<text
-						fontFamily="Verdana"
-						x={0}
-						y={0}
-						textAnchor="middle"
-					>
-						{nfa.name(state)}
-					</text>
-				</g>
-			));
-		}
-
 		return (
 			<div className="VisualEditor">
 				<svg
@@ -545,27 +472,26 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 					onMouseLeave={(e) => this.onMouseLeave()}
 					onMouseUp={(e) => this.onMouseUp(e)}
 				>
-					<foreignObject
-						x={20}
-						y={20}
-						width={250}
-						height={80}
-					>
-						{!nfa.isRunning
-							? (<button className="btn btn-default" onClick={() => this.props.reset()}>Start</button>)
-							: (<button className="btn btn-default" onClick={() => this.props.stop()}>Stop</button>)}
-						<button className="btn btn-default" onClick={() => this.props.run()}>Run</button>
-						<button className="btn btn-default" onClick={() => this.props.step()}>Step</button>
-						<button className="btn btn-default" onClick={() => this.props.back()}>Undo</button>
-						<input
-							type="text"
-							className="form-control"
-							value={nfa.remainingInput}
-							onChange={(e) => this.props.setInput(e.target.value)}
-						/>
-					</foreignObject>
 					{this.renderTransitions()}
-					{states}
+					{nfa.states.map((state) => (
+						<g
+							key={state}
+							transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
+						>
+							<VisualState
+								nfa={nfa}
+								state={state}
+								radius={this.STATE_RADIUS}
+								onMouseDown={(e) => this.onMouseDownState(e, state)}
+								onMouseEnter={(e) => this.onMouseEnterState(e, state)}
+								onMouseLeave={() => this.onMouseLeaveState()}
+								promptEditName={() => this.props.promptEditState(state)}
+								remove={() => this.props.confirmRemoveState(state)}
+								setStart={() =>  this.props.setStart(state)}
+								toggleAccept={() =>  this.props.toggleAccept(state)}
+							/>
+						</g>
+					))}
 				</svg>
 			</div>
 		);

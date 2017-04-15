@@ -7,3 +7,8 @@ body {
 	padding-top: 70px;
 	font-family: sans-serif;
 }
+
+.ControlPanel .form-inline > * {
+	margin-left: 2px;
+	margin-right: 2px;
+}

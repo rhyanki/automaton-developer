@@ -182,6 +182,7 @@ export default class RunnableNFA extends NFA {
 
 	/**
 	 * Run the NFA on the remaining input, stopping early if a definite rejection is reached.
+	 * Reset it first if it is not currently running.
 	 * @param input  Optional input to add to the remaining input before running.
 	 * @returns {NFA}
 	 */
@@ -192,6 +193,9 @@ export default class RunnableNFA extends NFA {
 		const nfa = this.mutable(true);
 		if (input) {
 			nfa.addInput(input);
+		}
+		if (!nfa.isRunning) {
+			nfa.reset();
 		}
 		while (nfa._remainingInput && nfa.result !== -1) {
 			nfa.step();
@@ -242,8 +246,7 @@ export default class RunnableNFA extends NFA {
 	 */
 	setTransition(origin: State, target: State, symbols: SymbolGroup | string): this {
 		if (this.isRunning && this.isCurrentState(origin) && new SymbolGroup(symbols).matches("")) {
-			const nfa = this.mutable(true);
-			super.setTransition(origin, target, symbols);
+			const nfa = super.setTransition(origin, target, symbols).mutable(true);
 			nfa._current = nfa._current.asMutable();
 			nfa._current.add(target);
 			nfa._followEmptyTransitions(target);
@@ -258,10 +261,14 @@ export default class RunnableNFA extends NFA {
 
 	/**
 	 * Consume the next symbol from the remaining input, updating the NFA's current states accordingly.
+	 * If the NFA is not running yet, reset and start it rather than stepping.
 	 * @returns {NFA}
 	 */
 	step() {
-		if (!this.isRunning || !this._remainingInput) {
+		if (!this.isRunning) {
+			return this.reset();
+		}
+		if (!this.remainingInput) {
 			return this;
 		}
 		const nfa = this.mutable(true);
