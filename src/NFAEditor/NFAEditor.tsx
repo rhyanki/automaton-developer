@@ -5,6 +5,7 @@ import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
 import TestInputEditor from './TestInputEditor/TestInputEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
+import presets from './presets';
 import './NFAEditor.css';
 
 const _editors = OrderedMap([
@@ -21,9 +22,7 @@ const _tabs = OrderedMap([
 
 const EDIT_SYMBOLS_DELIMITER = " ";
 
-type CProps = {
-	nfa: RunnableNFA
-};
+type CProps = null;
 type CState = {
 	nfa: RunnableNFA,
 	editor: EditorType,
@@ -33,16 +32,16 @@ type CState = {
 type EditorType = 'visual' | 'list';
 type Tab = 'test' | 'presets' | 'instructions' | 'convert';
 
-export default class NFAEditor extends React.PureComponent<CProps, CState> {
+export default class NFAEditor extends React.PureComponent<null, CState> {
 	history: RunnableNFA[];
 
-	constructor(props: CProps) {
-		super(props);
+	constructor() {
+		super();
 
 		this.history = [];
 
 		this.state = {
-			nfa: this.props.nfa,
+			nfa: new RunnableNFA((presets as any)[0].template),
 			editor: 'visual',
 			tab: 'instructions',
 			testInputs: List([""]),
@@ -104,10 +103,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		this.setState({
 			nfa: new RunnableNFA({
 				start: 0,
-				states: [{
-					name: "Start",
-					transitions: [],
-				}],
+				states: ["Start"],
 			})
 		});
 	}
@@ -135,12 +131,23 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		};
 	}
 
+	editAlphabet() {
+		const input = window.prompt(
+			"Enter a new alphabet (leave blank for default).",
+			this.state.nfa.alphabet.toString(EDIT_SYMBOLS_DELIMITER, false)
+		);
+		if (input === null) {
+			return;
+		}
+		this.handle('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
+	}
+
 	promptAddTransition(origin: State, target: State) {
 		this.promptUpdateTransitionSymbols(origin, target);
 	}
 
 	promptEditState(state: State) {
-		const newName = window.prompt("Enter a state name.", this.props.nfa.name(state));
+		const newName = window.prompt("Enter a state name.", this.state.nfa.name(state));
 		if (newName) {
 			this.setName(state, newName);
 		}
@@ -285,6 +292,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 							addState={this.addState}
 							back={this.back}
 							clear={this.clear}
+							editAlphabet={this.editAlphabet}
 							reset={this.reset}
 							run={this.run}
 							setInput={this.setInput}

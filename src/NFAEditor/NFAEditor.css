@@ -47,4 +47,5 @@
 
 .click-editable:hover {
 	background-color: aquamarine;
+	cursor: pointer;
 }

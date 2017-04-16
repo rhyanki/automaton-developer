@@ -79,6 +79,10 @@ for (const range of ["A-Z", "a-z", "0-9", "А-Я", "а-я", "Α-Ω", "α-ω"]) {
 	_allowedRanges.push(new CharRange(range));
 }
 
+// All parameters which ask for a symbol group should also be able to accept an input string
+// which can be converted to one.
+export type SymbolGroupInput = SymbolGroup | string | undefined;
+
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
  * The following special codes are allowed:
@@ -90,11 +94,27 @@ class SymbolGroup {
 	_normalized: string;
 
 	/**
+	 * Merge any number of symbol groups.
+	 */
+	static merge(symbolGroups: Iterable<SymbolGroupInput>): SymbolGroup {
+		let input = "";
+		for (const group of symbolGroups) {
+			if (group instanceof SymbolGroup) {
+				input += " " + group._normalized;
+			} else if (group) {
+				input += " " + group;
+			}
+		}
+		return new SymbolGroup(input);
+	}
+
+	/**
 	 * Check whether a set of SymbolGroups share any symbols between them.
 	 */
-	static shareAny(symbolGroups: Iterable<SymbolGroup>): boolean {
+	static shareAny(symbolGroups: Iterable<SymbolGroupInput>): boolean {
 		const allSymbols = Set().asMutable();
-		for (const group of symbolGroups) {
+		for (let group of symbolGroups) {
+			group = new SymbolGroup(group);
 			for (const symbol of group._symbols) {
 				if (allSymbols.has(symbol)) {
 					return true;
@@ -143,9 +163,8 @@ class SymbolGroup {
 
 		const symbols = Set<Symbol>().asMutable();
 
-		// Special case: empty input or a single character are interpreted literally
+		// Special case: empty input is interpreted as ε
 		if (input === "" || input === "~" || input === "ε") {
-			symbols.add("");
 			input = "";
 		} else if (input.length === 1) {
 			symbols.add(input[0]);
@@ -205,6 +224,19 @@ class SymbolGroup {
 	}
 
 	/**
+	 * Whether this symbol group contains a symbol group.
+	 */
+	contains(symbols: SymbolGroupInput): boolean {
+		symbols = new SymbolGroup(symbols);
+		for (const symbol of symbols) {
+			if (!this.has(symbol)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Return whether this symbol group is equivalent to another symbol group (i.e. they match the same symbols).
 	 */
 	equals(symbolGroup: SymbolGroup | void): boolean {
@@ -215,9 +247,9 @@ class SymbolGroup {
 	}
 
 	/**
-	 * Return whether or not the symbol group matches a given single symbol.
+	 * Whether this symbol group contains a symbol.
 	 */
-	matches(symbol: string): boolean {
+	has(symbol: Symbol) {
 		return this._symbols.has(symbol);
 	}
 
@@ -226,18 +258,19 @@ class SymbolGroup {
 	 * @param {SymbolGroup} other The other symbol group.
 	 * @returns {SymbolGroup} The new merged symbol group, or the current one if no change.
 	 */
-	merge(other: SymbolGroup): SymbolGroup {
-		if (!(other instanceof SymbolGroup)) {
+	merge(other: SymbolGroupInput): SymbolGroup {
+		const merged = SymbolGroup.merge([this, other]);
+		if (this.equals(merged)) {
 			return this;
 		}
-		let newSymbols = new SymbolGroup(this._normalized + other._normalized);
-		if (newSymbols.equals(this)) {
-			return this;
-		}
-		return newSymbols;
+		return merged;
 	}
 
-	toString(delimiter: string = " "): string {
+	/**
+	 * @param delimiter
+	 * @param includeEmpty Whether to include ε in the output.
+	 */
+	toString(delimiter: string = " ", includeEmpty: boolean = false): string {
 		const outputForm = (symbol: Symbol): string => {
 			const special = _toSpecial.get(symbol);
 			if (special) {
@@ -260,7 +293,6 @@ class SymbolGroup {
 			if (!rangeStart) {
 				return;
 			}
-			console.log("Finish range: " + rangeEnd);
 			const finalRange = new CharRange(rangeStart, rangeEnd);
 			const rangeLen = finalRange.toString().length;
 			const otherwiseLen = finalRange.size + (finalRange.size - 1) * delimiter.length;
@@ -276,10 +308,12 @@ class SymbolGroup {
 		};
 
 		for (const symbol of this._symbols) {
+			if (!includeEmpty && symbol === "") {
+				continue;
+			}
 			// If we're in a range, either continue or finish it
 			if (rangeStart) {
 				if (symbol.charCodeAt(0) - rangeEnd.charCodeAt(0) === 1 && (allowedRange as CharRange).contains(symbol)) {
-					console.log("Continue range: " + symbol);
 					rangeEnd = symbol;
 					continue;
 				} else {
@@ -289,7 +323,6 @@ class SymbolGroup {
 			// Otherwise, see if it can be made into a character range
 			for (allowedRange of _allowedRanges) {
 				if (allowedRange.contains(symbol)) {
-					console.log("Starting range: " + symbol);
 					rangeStart = symbol;
 					rangeEnd = symbol;
 					break;
@@ -305,6 +338,13 @@ class SymbolGroup {
 		finishRange();
 
 		return blocks.join(delimiter);
+	}
+
+	/**
+	 * Iterate over all the symbols in the group.
+	 */
+	*[Symbol.iterator](): IterableIterator<Symbol> {
+		yield *this._symbols;
 	}
 }
 

@@ -7,6 +7,7 @@ type CProps = {
 	addState: () => any,
 	back: () => any,
 	clear: () => any,
+	editAlphabet: () => any,
 	reset: () => any,
 	run: () => any,
 	setInput: (input: string) => any,
@@ -26,7 +27,6 @@ export default class ControlPanel extends React.PureComponent<CProps, null> {
 				<form className="form-inline">
 					<button className="btn btn-default" onClick={() => this.props.addState()}>Add State</button>
 					<button className="btn btn-default" onClick={() => this.props.clear()}>Clear All</button>
-					<label>Remaining input</label>
 					<input
 						type="text"
 						className="form-control"
@@ -55,6 +55,10 @@ export default class ControlPanel extends React.PureComponent<CProps, null> {
 					>
 						Stop
 					</button>
+					<label>Alphabet: </label>
+					<span className="click-editable" onClick={() => this.props.editAlphabet()}>
+						{nfa.alphabet.toString(", ", false)}
+					</span>
 				</form>
 			</div>
 		);

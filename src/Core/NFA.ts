@@ -1,5 +1,5 @@
 import {Map, Set, isImmutable} from 'immutable';
-import SymbolGroup from './SymbolGroup';
+import SymbolGroup, {SymbolGroupInput} from './SymbolGroup';
 
 /**
  * If mutable = true, update functions will directly modify the NFA and its elements (and theirs)
@@ -19,13 +19,11 @@ import SymbolGroup from './SymbolGroup';
 
 export type State = number;
 export type NFATemplate = {
-	states: Iterable<{
-		name: string,
-		accept?: boolean,
-		transitions: Iterable<[State, string]>,
-	}>,
+	alphabet?: string;
+	accepts?: Iterable<number>,
+	states: Iterable<string>,
+	transitions?: Iterable<[number, number, SymbolGroupInput]>,
 	start: State,
-	mutable?: boolean,
 };
 export type TransitionGroup = Map<State, SymbolGroup>;
 export type TransitionMap = Map<State, TransitionGroup>;
@@ -33,6 +31,7 @@ export type TransitionMap = Map<State, TransitionGroup>;
 export {SymbolGroup};
 
 export default class NFA {
+	protected _alphabet: SymbolGroup;
 	protected _states: Set<State>;
 	protected _start: State;
 	protected _names: Map<State, string>;
@@ -54,19 +53,10 @@ export default class NFA {
 	};
 	
 	constructor(template: NFA | NFATemplate, mutable?: boolean) {
-		console.log("constructing");
 		this._init(template, mutable);
 	}
 
 	protected _init(template: NFA | NFATemplate, mutable?: boolean): this {
-		this._mutable = true;
-		this._start = 0;
-		this._states = Set<State>().asMutable();
-		this._names = Map<State, string>().asMutable();
-		this._accept = Set<State>().asMutable();
-		this._transitions = <TransitionMap> Map().asMutable();
-		this._cache = {};
-
 		// If this is a copy of an existing NFA ...
 		if (template instanceof NFA) {
 			for (var k in template) {
@@ -94,34 +84,55 @@ export default class NFA {
 		}
 
 		// Otherwise, build a new NFA from a template.
+		this._mutable = true;
+		this._start = 0;
+		this._states = Set<State>().asMutable();
+		this._names = Map<State, string>().asMutable();
+		this._accept = Set<State>().asMutable();
+		this._transitions = Map().asMutable() as TransitionMap;
+		this._cache = {};
 		this._shared = {
 			nextID: 1,
 		};
 
-		// Parse input states
-		for (const stateData of template.states) {
-			const state = this._shared.nextID;
-			this._states.add(state);
-			this._names.set(state, stateData.name);
-			if (stateData.accept) {
-				this._accept.add(state);
-			}
-			// Parse transitions
-			const transitions = <TransitionGroup> Map().asMutable();
-			for (const [target, symbolsStr] of stateData.transitions) {
-				transitions.set(target, new SymbolGroup(symbolsStr));
-			}
+		const idMap = Map().asMutable() as Map<number, State>;
 
-			this._transitions.set(state, transitions);
+		// Parse input states
+		let i = 0;
+		for (const name of template.states) {
+			const state = this._shared.nextID;
+			idMap.set(i, state);
+			this._states.add(state);
+			this._names.set(state, name);
+			this._transitions.set(state, Map().asMutable() as TransitionGroup);
 			this._shared.nextID++;
+			i++;
+		}
+		// Parse transitions
+		if (template.transitions) {
+			for (let [origin, target, symbols] of template.transitions) {
+				if (!idMap.has(origin) || !idMap.has(target)) {
+					continue;
+				}
+				const transitions = this._transitions.get(idMap.get(origin) as State);
+				if (!transitions) {
+					continue;
+				}
+				target = idMap.get(target) as State;
+				transitions.set(target, new SymbolGroup(symbols));
+			}
+		}
+
+		// Parse accepts
+		this._accept = Set().asMutable();
+		if (template.accepts) {
+			this._accept = this._accept.concat(template.accepts).map((index) => idMap.get(index) as State);
 		}
 
 		this._start = this.state(template.start);
+		this._alphabet = this.minimalAlphabet(template.alphabet);
 
-		// If mutable param is given, that will be used; otherwise, template.mutable is used; otherwise, immutable by default.
-		if (mutable === undefined) {
-			mutable = template.mutable || false;
-		}
+		// Immutable by default
 		if (!mutable) {
 			this.immutable();
 		}
@@ -163,6 +174,13 @@ export default class NFA {
 	}
 
 	/**
+	 * Get the alphabet.
+	 */
+	get alphabet(): SymbolGroup {
+		return this._alphabet;
+	}
+
+	/**
 	 * Get the generating states (those with a path to an accept state).
 	 */
 	get generatingStates(): Set<State> {
@@ -189,7 +207,7 @@ export default class NFA {
 				const transitions = this.transitionsFrom(origin);
 				// First check whether there are any empty transitions
 				for (const symbols of transitions.values()) {
-					if (symbols.matches("")) {
+					if (symbols.has("")) {
 						return this._cache.isDFA = false;
 					}
 				}
@@ -300,7 +318,7 @@ export default class NFA {
 		if (!symbols) {
 			return false;
 		}
-		if (symbol !== undefined && !symbols.matches(symbol)) {
+		if (symbol !== undefined && !symbols.has(symbol)) {
 			return false;
 		}
 		return true;
@@ -310,7 +328,6 @@ export default class NFA {
 	 * Make this NFA (deeply) immutable, preventing any further changes from ever being made to it or its constituents.
 	 */
 	immutable(): this {
-		console.log("immutable");
 		if (!this._mutable) {
 			return this;
 		}
@@ -346,6 +363,21 @@ export default class NFA {
 	isStart(state: State): boolean {
 		state = this.state(state);
 		return !!state && this._start === state;
+	}
+
+	/**
+	 * Get the minimal alphabet for this NFA; i.e., the set of all symbols in all its transitions.
+	 * @param include If provided, these symbols will also be included in the resultant alphabet.
+	 */
+	minimalAlphabet(include?: SymbolGroupInput): SymbolGroup {
+		const allSymbolGroups = [];
+		for (const origin of this._states) {
+			for (const [, symbols] of this.transitionsFrom(origin)) {
+				allSymbolGroups.push(symbols);
+			}
+		}
+		allSymbolGroups.push(include);
+		return SymbolGroup.merge(allSymbolGroups);
 	}
 
 	/**
@@ -487,9 +519,27 @@ export default class NFA {
 	}
 
 	/**
+	 * Set the alphabet.
+	 */
+	setAlphabet(alphabet: SymbolGroupInput): NFA {
+		const newAlphabet = this.minimalAlphabet(alphabet);
+		if (this._alphabet.equals(newAlphabet)) {
+			return this;
+		}
+
+		const nfa = this.mutable(true);
+		nfa._alphabet = newAlphabet;
+
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
 	 * Set the name of a state.
-	 * @param state  The state to set.
-	 * @param name  The new name.
+	 * @param state The state to set.
+	 * @param name The new name.
 	 * @returns The new NFA.
 	 */
 	setName(state: State, name: string): this {
@@ -504,7 +554,6 @@ export default class NFA {
 		if (!this._mutable) {
 			nfa.immutable();
 		}
-
 		return nfa;
 	}
 
@@ -536,7 +585,7 @@ export default class NFA {
 	 * @param target  ID of the target state.
 	 * @param symbols  The new symbol group.
 	 */
-	setTransition(origin: State, target: State, symbols: SymbolGroup | string): this {
+	setTransition(origin: State, target: State, symbols: SymbolGroupInput): this {
 		origin = this.state(origin);
 		target = this.state(target);
 
@@ -556,6 +605,9 @@ export default class NFA {
 
 		const cache = this._cache;
 		const nfa = this.mutable();
+
+		// The NFA's alphabet should be automatically updated to accommodate any new symbols
+		nfa._alphabet = nfa._alphabet.merge(symbols);
 
 		// hasTransition() above guarantees that this is not undefined
 		const transitions = (<TransitionGroup> nfa._transitions.get(origin)).asMutable();

@@ -50,7 +50,7 @@ export default class RunnableNFA extends NFA {
 		}
 		for (const origin of origins) {
 			for (const [target, symbols] of this.transitionsFrom(origin)) {
-				if (symbols.matches("")) {
+				if (symbols.has("")) {
 					this._current.add(target);
 					this._followedTransitions.set(origin + "-" + target, this._numRead);
 					this._followEmptyTransitions(target);
@@ -246,7 +246,7 @@ export default class RunnableNFA extends NFA {
 	 * @override 
 	 */
 	setTransition(origin: State, target: State, symbols: SymbolGroup | string): this {
-		if (this.isRunning && this.isCurrentState(origin) && new SymbolGroup(symbols).matches("")) {
+		if (this.isRunning && this.isCurrentState(origin) && new SymbolGroup(symbols).has("")) {
 			const nfa = super.setTransition(origin, target, symbols).mutable(true);
 			nfa._current = nfa._current.asMutable();
 			nfa._current.add(target);
@@ -285,7 +285,7 @@ export default class RunnableNFA extends NFA {
 		const newStates = Set().asMutable();
 		for (const origin of nfa._current) {
 			for (const [target, symbols] of nfa.transitionsFrom(origin)) {
-				if (symbols.matches(symbol)) {
+				if (symbols.has(symbol)) {
 					newStates.add(target);
 					nfa._followedTransitions.set(origin + "-" + target, nfa._numRead);
 				}
