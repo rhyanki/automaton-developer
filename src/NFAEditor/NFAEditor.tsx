@@ -33,6 +33,7 @@ type EditorType = 'visual' | 'list';
 type Tab = 'test' | 'presets' | 'instructions' | 'convert';
 
 export default class NFAEditor extends React.PureComponent<null, CState> {
+	_visualEditor: VisualEditor;
 	history: RunnableNFA[];
 
 	constructor() {
@@ -140,6 +141,12 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 			return;
 		}
 		this.handle('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
+	}
+
+	loadPreset(index: number) {
+		this.setState({
+			nfa: new RunnableNFA(presets[index].template),
+		});
 	}
 
 	promptAddTransition(origin: State, target: State) {
@@ -261,15 +268,14 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 						<label>Editing symbols</label>
 						<p>Click the symbols of a transition to edit them.</p>
 						<p>
-							Enter a comma-separated list of characters (symbols) to transition on.
-							Currently, only ASCII symbols are supported.
+							Enter a list of characters (symbols) to transition on, separated by spaces.
 						</p>
 						<p>
 							Common backslash sequences are recognized (\n, \\, etc.).
 							You can also use a backslash before a space or a comma.
 						</p>
 						<p>
-							Character ranges (e.g. a-z) are supported.
+							Character ranges (e.g. a-z) are supported for digits, and the Latin, Greek and Cyrillic alphabets.
 						</p>
 						<label>Editing transitions in the visual editor</label>
 						<p>
@@ -278,6 +284,20 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 						<p>
 							To delete a transition, just click on its arrow shaft.
 						</p>
+					</div>
+					<div style={this.displayIf(this.state.tab === 'presets')}>
+						<table className="table">
+							<tbody>
+							{presets.map((preset, index) => (
+								<tr>
+									<td>{preset.description}</td>
+									<td>
+										<button className="btn btn-default" onClick={() => this.loadPreset(index)}>Load</button>
+									</td>
+								</tr>
+							))}
+							</tbody>
+						</table>
 					</div>
 					<div style={this.displayIf(this.state.tab === 'convert')}>
 						<button className="btn btn-default" disabled={nfa.isDFA} title={nfa.isDFA ? "Your NFA is already a DFA." : ""}>
@@ -313,6 +333,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 					</div>
 					<div className="editor" style={this.displayIf(editor === 'visual')}>
 						<VisualEditor
+							ref={(ref) => this._visualEditor = ref}
 							nfa={nfa}
 							confirmRemoveState={this.confirmRemoveState}
 							confirmRemoveTransition={this.confirmRemoveTransition}

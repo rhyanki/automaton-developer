@@ -1,13 +1,14 @@
 import * as React from 'react';
-import RunnableNFA, {State} from '../../Core/RunnableNFA';
+import NFA, {State} from '../../Core/RunnableNFA';
 import {Map} from 'immutable';
 import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
+import {shareAny} from '../../Util/sets';
 import VisualState from './VisualState/VisualState';
 import LabelledArrow from './LabelledArrow';
 import './VisualEditor.css';
 
 type CProps = {
-	nfa: RunnableNFA,
+	nfa: NFA,
 	confirmRemoveState: (state: State) => any,
 	confirmRemoveTransition: (origin: State, target: State) => any,
 	promptAddTransition: (origin: State, target: State) => any,
@@ -61,15 +62,19 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		if (this.props.nfa.states === nextProps.nfa.states) {
 			return;
 		}
-		// Check if any states have been added
-		for (const state of nextProps.nfa.states) {
-			if (!this.state.positions.has(state)) {
-				// Put them in the center of the editor by default
-				this.setState((prevState, prevProps) => {
-					return {
-						positions: prevState.positions.set(state, this.DEFAULT_POS)
-					};
-				});
+		if (!shareAny([this.state.positions.keys(), nextProps.nfa.states])) {
+			this.resetPositions(nextProps.nfa);
+		} else {
+			// Check if any states have been added
+			for (const state of this.props.nfa.states) {
+				if (!this.state.positions.has(state)) {
+					// Put them in the center of the editor by default
+					this.setState((prevState) => {
+						return {
+							positions: prevState.positions.set(state, this.DEFAULT_POS)
+						};
+					});
+				}
 			}
 		}
 	}
@@ -262,16 +267,19 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	/**
 	 * Set the positions of the states so that they are arranged in a circle around the center of the editor.
 	 */
-	resetPositions() {
+	resetPositions(nfa?: NFA) {
 		this.setState((prevState: CState, prevProps: CProps) => {
+			if (!nfa) {
+				nfa = prevProps.nfa;
+			}
 			const positions = Map().asMutable(); // Stores the positions of each state
-			const numStates = prevProps.nfa.numStates;
+			const numStates = nfa.numStates;
 
 			let angle = Math.PI; // The angle at which the next state should be placed
 			const offset = Math.min(this.width, this.height) * 0.3; // The distance each state should start from the centre
 			const direction = -1; // -1 for clockwise, 1 for anticlockwise
 
-			for (const state of prevProps.nfa.states) {
+			for (const state of nfa.states) {
 				const x = Math.round(this.width * 0.5 + Math.cos(angle) * offset);
 				const y = Math.round(this.height * 0.5 - Math.sin(angle) * offset);
 				positions.set(state, new Vector(x, y));

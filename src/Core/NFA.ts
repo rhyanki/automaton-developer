@@ -20,9 +20,9 @@ import SymbolGroup, {SymbolGroupInput} from './SymbolGroup';
 export type State = number;
 export type NFATemplate = {
 	alphabet?: string;
-	accepts?: Iterable<number>,
-	states: Iterable<string>,
-	transitions?: Iterable<[number, number, SymbolGroupInput]>,
+	accepts?: number[],
+	states: string[],
+	transitions?: [number, number, string][],
 	start: State,
 };
 export type TransitionGroup = Map<State, SymbolGroup>;
@@ -31,6 +31,8 @@ export type TransitionMap = Map<State, TransitionGroup>;
 export {SymbolGroup};
 
 export default class NFA {
+	static nextID: number = 1;
+
 	protected _alphabet: SymbolGroup;
 	protected _states: Set<State>;
 	protected _start: State;
@@ -45,11 +47,6 @@ export default class NFA {
 		isDFA?: boolean,
 		reachableStates?: Set<State>,
 		willAccept?: boolean,
-	};
-
-	// A single object shared by the NFA and all its copies
-	protected _shared: {
-		nextID: number,
 	};
 	
 	constructor(template: NFA | NFATemplate, mutable?: boolean) {
@@ -91,21 +88,18 @@ export default class NFA {
 		this._accept = Set<State>().asMutable();
 		this._transitions = Map().asMutable() as TransitionMap;
 		this._cache = {};
-		this._shared = {
-			nextID: 1,
-		};
 
 		const idMap = Map().asMutable() as Map<number, State>;
 
 		// Parse input states
 		let i = 0;
 		for (const name of template.states) {
-			const state = this._shared.nextID;
+			const state = NFA.nextID;
 			idMap.set(i, state);
 			this._states.add(state);
 			this._names.set(state, name);
 			this._transitions.set(state, Map().asMutable() as TransitionGroup);
-			this._shared.nextID++;
+			NFA.nextID++;
 			i++;
 		}
 		// Parse transitions
@@ -129,7 +123,7 @@ export default class NFA {
 			this._accept = this._accept.concat(template.accepts).map((index) => idMap.get(index) as State);
 		}
 
-		this._start = this.state(template.start);
+		this._start = idMap.get(template.start) || 0;
 		this._alphabet = this.minimalAlphabet(template.alphabet);
 
 		// Immutable by default
@@ -275,8 +269,8 @@ export default class NFA {
 		}
 
 		// Use a unique ID for the new state which has never been used by this NFA or its family of clones.
-		const id = this._shared.nextID;
-		this._shared.nextID++;
+		const id = NFA.nextID;
+		NFA.nextID++;
 
 		const nfa = this.mutable(true); // Note that the entire cache can be copied
 

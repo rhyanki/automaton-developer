@@ -3,7 +3,7 @@ import {Set} from 'immutable';
 /**
  * Check whether any number of sets share any element.
  */
-export function shareAny(sets: Iterable<Set<any>>) {
+export function shareAny(sets: Iterable<Iterable<any>>) {
 	const union = Set().asMutable();
 	for (const set of sets) {
 		for (const x of set) {
