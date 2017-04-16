@@ -30,6 +30,8 @@ export type NFATemplate = {
 export type TransitionGroup = Map<State, SymbolGroup>;
 export type TransitionMap = Map<State, TransitionGroup>;
 
+export {SymbolGroup};
+
 export default class NFA {
 	protected _states: Set<State>;
 	protected _start: State;
@@ -627,18 +629,6 @@ export default class NFA {
 			return new SymbolGroup();
 		}
 		return transitions.get(target) || new SymbolGroup();
-	}
-
-	/**
-	 * Return the symbols of a transition from one state to another, as a string (empty string if no such transition).
-	 */
-	symbolsString(origin: State, target: State) {
-		const symbols = this.symbols(origin, target);
-		if (!symbols) {
-			return "";
-		} else {
-			return symbols.toString();
-		}
 	}
 
 	/**

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import RunnableNFA, {State} from '../Core/RunnableNFA';
+import RunnableNFA, {State, SymbolGroup} from '../Core/RunnableNFA';
 import {List, OrderedMap} from 'immutable';
 import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
@@ -18,6 +18,8 @@ const _tabs = OrderedMap([
 	['presets', "Presets"],
 	['convert', "Convert"],
 ]) as OrderedMap<Tab, string>;
+
+const EDIT_SYMBOLS_DELIMITER = " ";
 
 type CProps = {
 	nfa: RunnableNFA
@@ -145,11 +147,14 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	promptUpdateTransitionSymbols(origin: State, target: State) {
-		const symbols = window.prompt("Enter a new symbol or symbols.", this.state.nfa.symbols(origin, target).toString());
+		const symbols = window.prompt(
+			"Enter a new symbol or symbols.",
+			this.state.nfa.symbols(origin, target).toString(EDIT_SYMBOLS_DELIMITER)
+		);
 		if (symbols === null) {
 			return;
 		}
-		this.handle('setTransition', origin, target, symbols);
+		this.handle('setTransition', origin, target, new SymbolGroup(symbols, EDIT_SYMBOLS_DELIMITER));
 	}
 
 	reset(input?: string) {

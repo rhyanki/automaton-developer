@@ -1,23 +1,83 @@
-import {Map, Set} from 'immutable';
+import {Map, OrderedSet, Set} from 'immutable';
 
-const _allowedCharsRegex = /^[\x00-\x7Fε␣]*$/;
-const _backslashSymbols = Map([
-	["n", "\n"],
-	["r", "\r"],
-	["t", "\t"],
-	["f", "\f"],
-	["v", "\v"],
+type Symbol = string;
+
+class CharRange {
+	_start: number; // Codepoint of first character in range
+	_end: number; // Codepoint of last character in range
+
+	/**
+	 * @param range The range as a single character, or string of the form "a-z".
+	 * @param end The last character in the range. If provided, the range param is taken to be the first character.
+	 */
+	constructor(range: string | Symbol | CharRange, end?: string) {
+		if (range instanceof CharRange) {
+			return range;
+		}
+		this._start = range.charCodeAt(0);
+		if (!end) {
+			if (range.length === 3) {
+				end = range[2];
+			} else {
+				end = range;
+			}
+		}
+		this._end = end.charCodeAt(0);
+		if (this._end < this._start) {
+			const start = this._start;
+			this._start = this._end;
+			this._end = start;
+		}
+	}
+
+	get size(): number {
+		return this._end - this._start;
+	}
+
+	/**
+	 * Whether the range contains a symbol or another range within it.
+	 */
+	contains(range: Symbol | CharRange | string): boolean {
+		const r = new CharRange(range);
+		return this._start <= r._start && r._end <= this._end;
+	}
+
+	toString() {
+		return String.fromCharCode(this._start) + "-" + String.fromCharCode(this._end);
+	}
+
+	/**
+	 * Iterate over all the characters in the range.
+	 */
+	*[Symbol.iterator](): IterableIterator<Symbol> {
+		let current = this._start;
+		while (current <= this._end) {
+			yield String.fromCharCode(current);
+			current++;
+		}
+	}
+}
+
+// The symbols which MUST be specially represented in the symbol group's input and output.
+const _fromSpecial = Map<string, Symbol>([
+	["ε", ""],
+	["~", ""],
+	["␣", " "],
+	["\\\\", "\\"],
+	["\\n", "\n"],
+	["\\r", "\r"],
+	["\\t", "\t"],
+	["\\f", "\f"],
+	["\\v", "\v"],
 ]);
-const _toBackslash = Map([
-	["~", "~"],
-	[",", ","],
-	["\\", "\\"],
-	["\n", "n"],
-	["\r", "r"],
-	["\t", "t"],
-	["\f", "f"],
-	["\v", "v"],
-]);
+const _toSpecial = _fromSpecial.flip();
+
+// Character ranges which are allowed.
+const _allowedRanges = [] as CharRange[];
+
+for (const range of ["A-Z", "a-z", "0-9", "А-Я", "а-я", "Α-Ω", "α-ω"]) {
+	_allowedRanges.push(new CharRange(range));
+}
 
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
@@ -26,7 +86,7 @@ const _toBackslash = Map([
  *     a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
  */
 class SymbolGroup {
-	_symbols: Set<string>;
+	_symbols: OrderedSet<Symbol>; // Ordered set of all symbols (as strings) in the group, sorted by Unicode code point
 	_normalized: string;
 
 	/**
@@ -62,14 +122,14 @@ class SymbolGroup {
 	/**
 	 * Construct a new SymbolGroup based on an input string.
 	 * If no input string, creates an empty SymbolGroup (matches nothing).
-	 * @param input  The input string, containing any ASCII characters or ε.
+	 * @param input The input string.
 	 * - Backslash codes (such as \n) and ranges (such as a-z) are allowed.
 	 * - ~ is an alias for ε (no symbol).
-	 * - All whitespace is stripped unless following a backslash.
+	 * @param delimiter The delimiter to recognize. Will be parsed as a regex.
 	 */
-	constructor(input?: string | SymbolGroup) {
+	constructor(input?: string | SymbolGroup, delimiter: string = " ") {
 		if (input === undefined) {
-			this._symbols = Set();
+			this._symbols = OrderedSet();
 			this._normalized = "";
 			return;
 		}
@@ -78,95 +138,70 @@ class SymbolGroup {
 			return input;
 		}
 
-		this._symbols = Set().asMutable();
+		// Unicode normalize the string, combining as many characters as possible
+		input = input.normalize();
 
-		if (!_allowedCharsRegex.test(input)) {
-			throw new Error("Only ASCII characters are allowed for now.");
-		}
+		const symbols = Set<Symbol>().asMutable();
 
 		// Special case: empty input or a single character are interpreted literally
 		if (input === "" || input === "~" || input === "ε") {
-			this._symbols.add("");
+			symbols.add("");
 			input = "";
 		} else if (input.length === 1) {
-			this._symbols.add(input[0]);
+			symbols.add(input[0]);
 			input = "";
 		}
 
-		// Remove all whitespace not following a backslash
-		input = input.replace(/([^\\])\s/g, "$1");
+		// Compile a regex for the delimiter
+		const delimiterRegex = new RegExp("^" + delimiter);
 
 		while (input.length > 0) {
 			let matches;
 
-			// Try to match a comma
-			if (input[0] === ',') {
-				input = input.substr(1);
+			// First try to match the delimiter
+			matches = input.match(delimiterRegex);
+			if (matches && matches[0].length !== 0) {
+				input = input.substr(matches[0].length);
 				continue;
 			}
 
 			// Try to match a character range
-			matches = input.match(/^(\\?[^,])-(\\?[^,])/);
+			matches = input.match(/^.-./);
 			if (matches) {
-				const rangeStart = this._parseSymbol(matches[1]).codePointAt(0);
-				const rangeEnd = this._parseSymbol(matches[2]).codePointAt(0);
-				if (rangeStart && rangeEnd) {
-					for (let p = rangeStart; p <= rangeEnd; p++) {
-						this._symbols.add(String.fromCodePoint(p));
+				const range = new CharRange(matches[0]);
+				for (const allowedRange of _allowedRanges) {
+					if (allowedRange.contains(range)) {
+						for (const symbol of range) {
+							symbols.add(symbol);
+						}
+						break;
 					}
 				}
 				input = input.substr(matches[0].length);
 				continue;
 			}
 
-			// Try to match a character
+			// Try to match a character or backslash sequence
 			matches = input.match(/^\\?./);
 			if (matches) {
-				this._symbols.add(this._parseSymbol(matches[0]));
-				input = input.substr(matches[0].length);
+				let match = matches[0];
+				const special = _fromSpecial.get(match);
+				if (special) {
+					symbols.add(special);
+				} else {
+					// If there is still a backslash, remove it and use the raw character
+					if (match.length > 1 && match[0] === "\\") {
+						match = match[1];
+					}
+					symbols.add(match);
+				}
+				input = input.substr(match.length);
 				continue;
 			}
 		}
 
-		// Now create the normalized string
-		const symbolsList = Array.from(this._symbols.keys());
-		symbolsList.sort();
-
-		for (let i = 0; i < symbolsList.length; i++) {
-			const symbol = symbolsList[i];
-			if (_toBackslash.has(symbol)) {
-				symbolsList[i] = "\\" + _toBackslash.get(symbol);
-			} else if (symbol === "") {
-				symbolsList[i] = "ε";
-			} else if (symbol === " ") {
-				symbolsList[i] = "␣";
-			}
-		}
-
-		this._normalized = symbolsList.join(", ");
-		this._symbols.asImmutable();
-	}
-
-	/**
-	 * Parse a raw input symbol (in the form of a backslash sequence, ~, or a normal character).
-	 */
-	_parseSymbol(input: string): string {
-		if (input[0] === "\\") {
-			const afterBackslash = input.substr(1);
-			const backslashSymbol = _backslashSymbols.get(afterBackslash);
-			if (backslashSymbol) {
-				return backslashSymbol;
-			} else {
-				return afterBackslash;
-			}
-		}
-		if (input === "ε" || input === "~") {
-			return "";
-		}
-		if (input === "␣") {
-			return " ";
-		}
-		return input;
+		this._symbols = symbols.sort() as OrderedSet<Symbol>;
+		this._normalized = this.toString(" ");
 	}
 
 	/**
@@ -202,9 +237,78 @@ class SymbolGroup {
 		return newSymbols;
 	}
 
-	toString(): string {
-		return this._normalized;
+	toString(delimiter: string = " "): string {
+		const outputForm = (symbol: Symbol): string => {
+			const special = _toSpecial.get(symbol);
+			if (special) {
+				// Convert it to a special symbol if possible
+				return special;
+			} else if (symbol === delimiter || _fromSpecial.has(symbol)) {
+				// If the symbol is the delimiter, or has special meaning (like ε), it has to be escaped.
+				return "\\" + symbol;
+			} else {
+				return symbol;
+			}
+		};
+
+		const blocks = [] as string[];
+		let allowedRange;
+		let rangeStart = "";
+		let rangeEnd = "";
+
+		const finishRange = () => {
+			if (!rangeStart) {
+				return;
+			}
+			console.log("Finish range: " + rangeEnd);
+			const finalRange = new CharRange(rangeStart, rangeEnd);
+			const rangeLen = finalRange.toString().length;
+			const otherwiseLen = finalRange.size + (finalRange.size - 1) * delimiter.length;
+			if (rangeLen < otherwiseLen) {
+				// Only output the character range if it would actually save space
+				blocks.push(finalRange.toString());
+			} else {
+				for (const s of finalRange) {
+					blocks.push(outputForm(s));
+				}
+			}
+			rangeStart = "";
+		};
+
+		for (const symbol of this._symbols) {
+			// If we're in a range, either continue or finish it
+			if (rangeStart) {
+				if (symbol.charCodeAt(0) - rangeEnd.charCodeAt(0) === 1 && (allowedRange as CharRange).contains(symbol)) {
+					console.log("Continue range: " + symbol);
+					rangeEnd = symbol;
+					continue;
+				} else {
+					finishRange();
+				}
+			}
+			// Otherwise, see if it can be made into a character range
+			for (allowedRange of _allowedRanges) {
+				if (allowedRange.contains(symbol)) {
+					console.log("Starting range: " + symbol);
+					rangeStart = symbol;
+					rangeEnd = symbol;
+					break;
+				}
+			}
+			if (rangeStart) {
+				continue;
+			}
+			// If not, just output the symbol
+			blocks.push(outputForm(symbol));
+		}
+		// Finish the current range if we're in one
+		finishRange();
+
+		return blocks.join(delimiter);
 	}
 }
+
+(window as any).SymbolGroup = SymbolGroup; // Debugging
+(window as any).CharRange = CharRange; // Debugging
 
 export default SymbolGroup;

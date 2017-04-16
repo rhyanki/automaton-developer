@@ -386,7 +386,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 						start={originPos}
 						control={control}
 						end={targetPos}
-						label={nfa.symbolsString(origin, target)}
+						label={nfa.symbols(origin, target).toString(", ")}
 						arrowHeadT={t}
 						onClickShaft={() => this.props.confirmRemoveTransition(origin, target)}
 						onClickLabel={() => this.props.promptUpdateTransitionSymbols(origin, target)}
@@ -437,7 +437,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 						start={start}
 						end={end}
 						radius={r}
-						label={nfa.symbolsString(state, state)}
+						label={nfa.symbols(state, state).toString(", ")}
 						onClickShaft={() => this.props.confirmRemoveTransition(state, state)}
 						onClickLabel={() => this.props.promptUpdateTransitionSymbols(state, state)}
 					/>

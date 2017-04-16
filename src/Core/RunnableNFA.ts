@@ -1,5 +1,4 @@
-import NFA, {NFATemplate, State, TransitionGroup, TransitionMap} from './NFA';
-import SymbolGroup from './SymbolGroup';
+import NFA, {NFATemplate, State, SymbolGroup, TransitionGroup, TransitionMap} from './NFA';
 import {Map, Set} from 'immutable';
 import {shareAny} from '../Util/sets';
 
@@ -8,6 +7,8 @@ export type Result = -1 | 0 | 1;
 export type State = State;
 export type TransitionGroup = TransitionGroup;
 export type TransitionMap = TransitionMap;
+
+export {SymbolGroup};
 
 export default class RunnableNFA extends NFA {
 	// Set of current possible states while running (if DFA, this always contains at most one state).
