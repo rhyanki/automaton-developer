@@ -1,6 +1,8 @@
 import * as React from 'react';
-import RunnableNFA, {State, SymbolGroup} from '../Core/RunnableNFA';
 import {List, OrderedMap} from 'immutable';
+
+import RunnableNFA, {State} from '../Core/RunnableNFA';
+import SymbolGroup, {allowedRanges} from '../Core/SymbolGroup';
 import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
 import TestInputEditor from './TestInputEditor/TestInputEditor';
@@ -17,7 +19,8 @@ const _tabs = OrderedMap([
 	['instructions', "Instructions"],
 	['test', "Test Inputs"],
 	['presets', "Presets"],
-	['convert', "Convert"],
+	['transform', "Transform"],
+	['port', "Import/Export"],
 ]) as OrderedMap<Tab, string>;
 
 const EDIT_SYMBOLS_DELIMITER = " ";
@@ -26,11 +29,12 @@ type CProps = null;
 type CState = {
 	nfa: RunnableNFA,
 	editor: EditorType,
+	importing: string,
 	tab: Tab,
 	testInputs: List<string>,
 };
 type EditorType = 'visual' | 'list';
-type Tab = 'test' | 'presets' | 'instructions' | 'convert';
+type Tab = 'test' | 'presets' | 'instructions' | 'transform' | 'port';
 
 export default class NFAEditor extends React.PureComponent<null, CState> {
 	_visualEditor: VisualEditor;
@@ -42,8 +46,9 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		this.history = [];
 
 		this.state = {
-			nfa: new RunnableNFA((presets as any)[0].template),
+			nfa: new RunnableNFA((presets as any)[0].definition),
 			editor: 'visual',
+			importing: "",
 			tab: 'instructions',
 			testInputs: List([""]),
 		};
@@ -103,8 +108,8 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 	clear() {
 		this.setState({
 			nfa: new RunnableNFA({
-				start: 0,
-				states: ["Start"],
+				n: 1,
+				names: ["Start"],
 			})
 		});
 	}
@@ -143,9 +148,29 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		this.handle('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
 	}
 
+	exportValue(): string {
+		return JSON.stringify({
+			nfa: this.state.nfa.toDefinition(),
+		});
+	}
+
+	import() {
+		this.setState((prevState) => {
+			try {
+				return {
+					importing: "",
+					nfa: new RunnableNFA(JSON.parse(prevState.importing).nfa),
+				};
+			} catch (e) {
+				window.alert("Invalid input.");
+				return;
+			}
+		});
+	}
+
 	loadPreset(index: number) {
 		this.setState({
-			nfa: new RunnableNFA(presets[index].template),
+			nfa: new RunnableNFA(presets[index].definition),
 		});
 	}
 
@@ -177,6 +202,13 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 
 	run() {
 		this.handle('run');
+	}
+
+	setImporting(contents: string) {
+		console.log("Updated importing");
+		this.setState({
+			importing: contents,
+		});
 	}
 
 	setInput(input: string) {
@@ -275,7 +307,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 							You can also use a backslash before a space or a comma.
 						</p>
 						<p>
-							Character ranges (e.g. a-z) are supported for digits, and the Latin, Greek and Cyrillic alphabets.
+							Subsets of the following character ranges are allowed: {allowedRanges.join(", ")}.
 						</p>
 						<label>Editing transitions in the visual editor</label>
 						<p>
@@ -289,7 +321,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 						<table className="table">
 							<tbody>
 							{presets.map((preset, index) => (
-								<tr>
+								<tr key={index}>
 									<td>{preset.description}</td>
 									<td>
 										<button className="btn btn-default" onClick={() => this.loadPreset(index)}>Load</button>
@@ -299,10 +331,35 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 							</tbody>
 						</table>
 					</div>
-					<div style={this.displayIf(this.state.tab === 'convert')}>
+					<div style={this.displayIf(this.state.tab === 'transform')}>
 						<button className="btn btn-default" disabled={nfa.isDFA} title={nfa.isDFA ? "Your NFA is already a DFA." : ""}>
 							Convert to DFA
 						</button>
+					</div>
+					<div style={this.displayIf(this.state.tab === 'port')}>
+						<form className="form-inline">
+							<button
+								className="btn btn-default"
+								onClick={() => this.setImporting("")}
+								disabled={!this.state.importing}
+								title={!this.state.importing ? "The exported NFA is already displayed below." : undefined}
+							>
+								Export
+							</button>
+							<br/>
+							<br/>
+							<textarea
+								className="form-control"
+								onChange={(e) => this.setImporting(e.target.value)}
+								rows={10}
+								value={this.state.importing ? this.state.importing : this.exportValue()}
+							/>
+							<br/>
+							<br/>
+							<button className="btn btn-default" disabled={!this.state.importing} onClick={() => this.import()}>
+								Import
+							</button>
+						</form>
 					</div>
 				</div>
 				<div className="col-md-9">

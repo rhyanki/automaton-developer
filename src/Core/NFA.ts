@@ -18,12 +18,12 @@ import SymbolGroup, {SymbolGroupInput} from './SymbolGroup';
  */
 
 export type State = number;
-export type NFATemplate = {
-	alphabet?: string;
-	accepts?: number[],
-	states: string[],
-	transitions?: [number, number, string][],
-	start: State,
+export type Definition = {
+	n: number,
+	accept?: number[],
+	alphabet?: string,
+	names?: string[],
+	transitions?: [number, string][][],
 };
 export type TransitionGroup = Map<State, SymbolGroup>;
 export type TransitionMap = Map<State, TransitionGroup>;
@@ -49,82 +49,99 @@ export default class NFA {
 		willAccept?: boolean,
 	};
 	
-	constructor(template: NFA | NFATemplate, mutable?: boolean) {
-		this._init(template, mutable);
+	constructor(definition: NFA | Definition, mutable?: boolean) {
+		this._init(definition, mutable);
 	}
 
-	protected _init(template: NFA | NFATemplate, mutable?: boolean): this {
+	protected _init(definition: NFA | Definition, mutable?: boolean): this {
 		// If this is a copy of an existing NFA ...
-		if (template instanceof NFA) {
-			for (var k in template) {
-				if (template.hasOwnProperty(k)) {
-					this[k] = template[k];
+		if (definition instanceof NFA) {
+			for (var k in definition) {
+				if (definition.hasOwnProperty(k)) {
+					this[k] = definition[k];
 				}
 			}
 			this._cache = {}; // All new NFAs get a new cache
 			this._mutable = true;
 			if (mutable === undefined) {
-				mutable = template._mutable;
+				mutable = definition._mutable;
 			}
 			if (!mutable) {
-				if (template._mutable) {
+				if (definition._mutable) {
 					// If the new DFA is immutable but the old one was not, we must explicitly make the new one immutable.
 					this.immutable();
 				} else {
 					// The one exception to each NFA having its own cache is if they are both immutable
 					// (and thus will be exactly the same forever).
 					this._mutable = false;
-					this._cache = template._cache;
+					this._cache = definition._cache;
 				}
 			}
 			return this;
 		}
 
-		// Otherwise, build a new NFA from a template.
+		// Otherwise, build a new NFA from a definition.
+
 		this._mutable = true;
-		this._start = 0;
 		this._states = Set<State>().asMutable();
 		this._names = Map<State, string>().asMutable();
 		this._accept = Set<State>().asMutable();
 		this._transitions = Map().asMutable() as TransitionMap;
 		this._cache = {};
 
-		const idMap = Map().asMutable() as Map<number, State>;
+		const idMap = [] as State[];
 
 		// Parse input states
-		let i = 0;
-		for (const name of template.states) {
+		for (let id = 0; id < definition.n; id++) {
 			const state = NFA.nextID;
-			idMap.set(i, state);
+			idMap.push(state);
 			this._states.add(state);
-			this._names.set(state, name);
+			this._names.set(state, id.toString());
 			this._transitions.set(state, Map().asMutable() as TransitionGroup);
 			NFA.nextID++;
-			i++;
 		}
+		this._start = idMap[0] || 0;
+
+		// Parse names
+		if (definition.names) {
+			let id = 0;
+			for (const name of definition.names) {
+				const state = idMap[id];
+				if (state) {
+					this._names.set(state, name);
+				}
+				id++;
+			}
+		}
+
 		// Parse transitions
-		if (template.transitions) {
-			for (let [origin, target, symbols] of template.transitions) {
-				if (!idMap.has(origin) || !idMap.has(target)) {
+		if (definition.transitions) {
+			let originID = 0;
+			for (const inputTransitions of definition.transitions) {
+				const origin = idMap[originID];
+				if (!origin) {
 					continue;
 				}
-				const transitions = this._transitions.get(idMap.get(origin) as State);
-				if (!transitions) {
-					continue;
+				const transitions = this._transitions.get(origin) as TransitionGroup;
+				for (const [targetID, symbols] of inputTransitions) {
+					const target = idMap[targetID];
+					if (!target) {
+						continue;
+					}
+					transitions.set(target, new SymbolGroup(symbols));
 				}
-				target = idMap.get(target) as State;
-				transitions.set(target, new SymbolGroup(symbols));
+				originID++;
 			}
 		}
 
 		// Parse accepts
-		this._accept = Set().asMutable();
-		if (template.accepts) {
-			this._accept = this._accept.concat(template.accepts).map((index) => idMap.get(index) as State);
+		if (definition.accept) {
+			this._accept = this._accept.concat(definition.accept);
+			this._accept = this._accept.map((id) => idMap[id]).filter((value) => value !== undefined) as Set<State>;
 		}
 
-		this._start = idMap.get(template.start) || 0;
-		this._alphabet = this.minimalAlphabet(template.alphabet);
+		// Parse alphabet
+		this._alphabet = this.minimalAlphabet(definition.alphabet);
 
 		// Immutable by default
 		if (!mutable) {
@@ -675,6 +692,53 @@ export default class NFA {
 			return new SymbolGroup();
 		}
 		return transitions.get(target) || new SymbolGroup();
+	}
+
+	/**
+	 * Get a definition of the NFA, easily convertable to JSON and parseable by the constructor.
+	 */
+	toDefinition(): Definition {
+		// Create a normalized ID map, mapping each state to an ID from 0 to numStates-1, where 0 is the start state.
+		const toState = [this._start];
+		let fromState = Map<State, number>([[this._start, 0]]).asMutable();
+
+		for (const state of this._states) {
+			if (state === this._start) {
+				continue;
+			}
+			fromState.set(state, toState.length);
+			toState.push(state);
+		}
+
+		const names = [] as string[];
+		for (const state of toState) {
+			names.push(this.name(state));
+		}
+
+		const accept = [] as number[];
+		for (const state of toState) {
+			if (this.isAccept(state)) {
+				accept.push(fromState.get(state) as number);
+			}
+		}
+
+		const transitions = [] as [number, string][][];
+		for (const origin of toState) {
+			const transitionsFrom = [] as [number, string][];
+			for (const [target, symbols] of this.transitionsFrom(origin)) {
+				transitionsFrom.push([fromState.get(target) as number, symbols.toString()]);
+			}
+			transitionsFrom.sort((a, b) => a[0] - b[0]);
+			transitions.push(transitionsFrom);
+		}
+		
+		return {
+			n: this.numStates,
+			alphabet: this._alphabet.toString(" ", false),
+			accept: accept,
+			names: names,
+			transitions: transitions,
+		};
 	}
 
 	/**

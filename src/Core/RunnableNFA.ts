@@ -1,8 +1,8 @@
-import NFA, {NFATemplate, State, SymbolGroup, TransitionGroup, TransitionMap} from './NFA';
+import NFA, {Definition, State, SymbolGroup, TransitionGroup, TransitionMap} from './NFA';
 import {Map, Set} from 'immutable';
 import {shareAny} from '../Util/sets';
 
-export type NFATemplate = NFATemplate;
+export type Definition = Definition;
 export type Result = -1 | 0 | 1;
 export type State = State;
 export type TransitionGroup = TransitionGroup;
@@ -26,12 +26,12 @@ export default class RunnableNFA extends NFA {
 	// The value is the step on which it was last followed.
 	protected _followedTransitions: Map<string, number>;
 
-	protected _init(template: NFA | NFATemplate, mutable?: boolean): this {
+	protected _init(definition: NFA | Definition, mutable?: boolean): this {
 		this._current = Set().asMutable();
 		this._remainingInput = "";
 		this._numRead = -1;
 		this._followedTransitions = Map().asMutable() as Map<string, number>;
-		return super._init(template, mutable);
+		return super._init(definition, mutable);
 	}
 
 	/**
@@ -162,7 +162,7 @@ export default class RunnableNFA extends NFA {
 
 	/**
 	 * Set up the NFA to be run, resetting to the start state and erasing the input buffer.
-	 * @param input  The (initial) input to add to the input buffer. If empty, will keep the previous input.
+	 * @param input The (initial) input to add to the input buffer. If empty, will keep the previous input.
 	 */
 	reset(input?: string): this {
 		const nfa = this.mutable(true);
@@ -184,8 +184,7 @@ export default class RunnableNFA extends NFA {
 	/**
 	 * Run the NFA on the remaining input, stopping early if a definite rejection is reached.
 	 * Reset it first if it is not currently running.
-	 * @param input  Optional input to add to the remaining input before running.
-	 * @returns {NFA}
+	 * @param input Optional input to add to the remaining input before running.
 	 */
 	run(input: string = ""): this {
 		if (this.result === -1) {
@@ -209,8 +208,7 @@ export default class RunnableNFA extends NFA {
 
 	/**
 	 * Run the NFA on the entire remaining input, continuing to run even if a definite rejection is reached.
-	 * @param input  The (initial) input to add to the input buffer.
-	 * @returns {NFA}
+	 * @param input The (initial) input to add to the input buffer.
 	 */
 	runComplete(input: string = ""): this {
 		const nfa = this.mutable(true);
@@ -263,9 +261,8 @@ export default class RunnableNFA extends NFA {
 	/**
 	 * Consume the next symbol from the remaining input, updating the NFA's current states accordingly.
 	 * If the NFA is not running yet, reset and start it rather than stepping.
-	 * @returns {NFA}
 	 */
-	step() {
+	step(): this {
 		if (!this.isRunning) {
 			return this.reset();
 		}
@@ -291,9 +288,9 @@ export default class RunnableNFA extends NFA {
 				}
 			}
 		}
+		nfa._current = newStates;
 
 		// And follow all empty transitions from the resultant states
-		nfa._current = newStates;
 		nfa._followEmptyTransitions();
 
 		if (!this._mutable) {
@@ -304,7 +301,6 @@ export default class RunnableNFA extends NFA {
 
 	/**
 	 * Stop running the NFA and erase the remaining input.
-	 * @returns {NFA}
 	 */
 	stop(): this {
 		if (!this.isRunning) {

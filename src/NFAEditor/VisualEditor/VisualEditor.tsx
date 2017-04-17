@@ -66,7 +66,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 			this.resetPositions(nextProps.nfa);
 		} else {
 			// Check if any states have been added
-			for (const state of this.props.nfa.states) {
+			for (const state of nextProps.nfa.states) {
 				if (!this.state.positions.has(state)) {
 					// Put them in the center of the editor by default
 					this.setState((prevState) => {
@@ -477,7 +477,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 					width="100%"
 					height="100%"
 					onMouseMove={(e) => this.onMouseMove(e)}
-					onMouseLeave={(e) => this.onMouseLeave()}
+					onMouseLeave={() => this.onMouseLeave()}
 					onMouseUp={(e) => this.onMouseUp(e)}
 				>
 					{this.renderTransitions()}

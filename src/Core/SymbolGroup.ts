@@ -73,11 +73,13 @@ const _fromSpecial = Map<string, Symbol>([
 const _toSpecial = _fromSpecial.flip();
 
 // Character ranges which are allowed.
-const _allowedRanges = [] as CharRange[];
+const allowedRanges = [] as CharRange[];
 
 for (const range of ["A-Z", "a-z", "0-9", "А-Я", "а-я", "Α-Ω", "α-ω"]) {
-	_allowedRanges.push(new CharRange(range));
+	allowedRanges.push(new CharRange(range));
 }
+
+export {allowedRanges};
 
 // All parameters which ask for a symbol group should also be able to accept an input string
 // which can be converted to one.
@@ -89,7 +91,7 @@ export type SymbolGroupInput = SymbolGroup | string | undefined;
  *     ~: represents ε (no symbol)
  *     a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
  */
-class SymbolGroup {
+export default class SymbolGroup {
 	_symbols: OrderedSet<Symbol>; // Ordered set of all symbols (as strings) in the group, sorted by Unicode code point
 	_normalized: string;
 
@@ -163,18 +165,10 @@ class SymbolGroup {
 
 		const symbols = Set<Symbol>().asMutable();
 
-		// Special case: empty input is interpreted as ε
-		if (input === "" || input === "~" || input === "ε") {
-			input = "";
-		} else if (input.length === 1) {
-			symbols.add(input[0]);
-			input = "";
-		}
-
 		// Compile a regex for the delimiter
 		const delimiterRegex = new RegExp("^" + delimiter);
 
-		while (input.length > 0) {
+		mainLoop: while (input.length > 0) {
 			let matches;
 
 			// First try to match the delimiter
@@ -188,16 +182,15 @@ class SymbolGroup {
 			matches = input.match(/^.-./);
 			if (matches) {
 				const range = new CharRange(matches[0]);
-				for (const allowedRange of _allowedRanges) {
+				for (const allowedRange of allowedRanges) {
 					if (allowedRange.contains(range)) {
 						for (const symbol of range) {
 							symbols.add(symbol);
 						}
-						break;
+						input = input.substr(matches[0].length);
+						continue mainLoop;
 					}
 				}
-				input = input.substr(matches[0].length);
-				continue;
 			}
 
 			// Try to match a character or backslash sequence
@@ -217,6 +210,11 @@ class SymbolGroup {
 				input = input.substr(match.length);
 				continue;
 			}
+		}
+
+		// Special case: if there are otherwise no symbols, consider it to be the empty transition symbol
+		if (symbols.size === 0) {
+			symbols.add("");
 		}
 
 		this._symbols = symbols.sort() as OrderedSet<Symbol>;
@@ -321,7 +319,7 @@ class SymbolGroup {
 				}
 			}
 			// Otherwise, see if it can be made into a character range
-			for (allowedRange of _allowedRanges) {
+			for (allowedRange of allowedRanges) {
 				if (allowedRange.contains(symbol)) {
 					rangeStart = symbol;
 					rangeEnd = symbol;
@@ -347,8 +345,3 @@ class SymbolGroup {
 		yield *this._symbols;
 	}
 }
-
-(window as any).SymbolGroup = SymbolGroup; // Debugging
-(window as any).CharRange = CharRange; // Debugging
-
-export default SymbolGroup;
