@@ -6,16 +6,17 @@
 		"lib": ["es2015", "dom"],
 		"sourceMap": true,
 		"allowJs": true,
-		"jsx": "react",
+		"jsx": "preserve",
 		"moduleResolution": "node",
 		"rootDir": "src",
-		"forceConsistentCasingInFileNames": true,
+		"forceConsistentCasingInFileNames": false,
 		"noImplicitReturns": true,
 		"noImplicitThis": false,
 		"noImplicitAny": true,
 		"strictNullChecks": true,
 		"suppressImplicitAnyIndexErrors": true,
-		"noUnusedLocals": true
+		"noUnusedLocals": true,
+		"allowSyntheticDefaultImports": true
 	},
 	"exclude": [
 		"node_modules",
