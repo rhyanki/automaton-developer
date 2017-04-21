@@ -68,34 +68,8 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		(window as any).nfa = this.state.nfa; // For debugging
 	}
 
-	/**
-	 * Update the NFAEditor's state with a new NFA, based on the result of calling one of the NFA's methods.
-	 * @param methodName The name of the NFA method to call.
-	 * @param args The args to pass to the NFA method call.
-	 */
-	handle(methodName: string, ...args: any[]): void {
-		this.setState((prevState, props) => {
-			if (!(prevState.nfa[methodName] instanceof Function)) {
-				console.log(methodName + " is not a valid NFA method!");
-				throw new Error(methodName + " is not a valid NFA method!");
-			}
-			try {
-				const newNFA = prevState.nfa[methodName](...args);
-				if (newNFA !== prevState.nfa) {
-					this.history.push(prevState.nfa);
-				}
-				return {
-					nfa: newNFA,
-				};
-			} catch (e) {
-				window.alert(e.message);
-				return;
-			}
-		});
-	}
-
 	addState(name?: string) {
-		this.handle('addState', name);
+		this.onNFA('addState', name);
 	}
 
 	back() {
@@ -114,18 +88,22 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		});
 	}
 
+	complete() {
+		this.onNFA('complete');
+	}
+
 	confirmRemoveState(state: State) {
 		if (!window.confirm("Are you sure you want to delete this state?")) {
 			return;
 		}
-		this.handle('removeState', ...arguments);
+		this.onNFA('removeState', ...arguments);
 	}
 
 	confirmRemoveTransition(origin: State, target: State) {
 		if (!window.confirm("Are you sure you want to delete this transition?")) {
 			return;
 		}
-		this.handle('removeTransition', ...arguments);
+		this.onNFA('removeTransition', ...arguments);
 	}
 
 	/**
@@ -139,13 +117,16 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 
 	editAlphabet() {
 		const input = window.prompt(
-			"Enter a new alphabet (leave blank for default).",
-			this.state.nfa.alphabet.toString(EDIT_SYMBOLS_DELIMITER, false)
+			"Enter a new alphabet (leave blank for implicit).",
+			this.state.nfa.hasSetAlphabet ? this.state.nfa.alphabet.toString(EDIT_SYMBOLS_DELIMITER, false) : ""
 		);
 		if (input === null) {
 			return;
 		}
-		this.handle('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
+		if (input === "") {
+			return this.onNFA('unsetAlphabet');
+		}
+		return this.onNFA('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
 	}
 
 	exportValue(): string {
@@ -174,6 +155,32 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		});
 	}
 
+	/**
+	 * Update the NFAEditor's state with a new NFA, based on the result of calling one of the NFA's methods.
+	 * @param methodName The name of the NFA method to call.
+	 * @param args The args to pass to the NFA method call.
+	 */
+	onNFA(methodName: string, ...args: any[]): void {
+		this.setState((prevState, props) => {
+			if (!(prevState.nfa[methodName] instanceof Function)) {
+				console.log(methodName + " is not a valid NFA method!");
+				throw new Error(methodName + " is not a valid NFA method!");
+			}
+			try {
+				const newNFA = prevState.nfa[methodName](...args);
+				if (newNFA !== prevState.nfa) {
+					this.history.push(prevState.nfa);
+				}
+				return {
+					nfa: newNFA,
+				};
+			} catch (e) {
+				window.alert(e.message);
+				return;
+			}
+		});
+	}
+
 	promptAddTransition(origin: State, target: State) {
 		this.promptUpdateTransitionSymbols(origin, target);
 	}
@@ -193,15 +200,15 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		if (symbols === null) {
 			return;
 		}
-		this.handle('setTransition', origin, target, new SymbolGroup(symbols, EDIT_SYMBOLS_DELIMITER));
+		this.onNFA('setTransition', origin, target, new SymbolGroup(symbols, EDIT_SYMBOLS_DELIMITER));
 	}
 
 	reset(input?: string) {
-		this.handle('reset', input);
+		this.onNFA('reset', input);
 	}
 
 	run() {
-		this.handle('run');
+		this.onNFA('run');
 	}
 
 	setImporting(contents: string) {
@@ -212,23 +219,23 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 	}
 
 	setInput(input: string) {
-		this.handle('setInput', ...arguments);
+		this.onNFA('setInput', ...arguments);
 	}
 
 	setName(state: State, name: string) {
-		this.handle('setName', ...arguments);
+		this.onNFA('setName', ...arguments);
 	}
 
 	setStart(state: State) {
-		this.handle('setStart', ...arguments);
+		this.onNFA('setStart', ...arguments);
 	}
 
 	step() {
-		this.handle('step');
+		this.onNFA('step');
 	}
 
 	stop() {
-		this.handle('stop');
+		this.onNFA('stop');
 	}
 
 	switchEditor(editor: EditorType) {
@@ -240,7 +247,11 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 	}
 
 	toggleAccept(state: State) {
-		this.handle('toggleAccept', ...arguments);
+		this.onNFA('toggleAccept', ...arguments);
+	}
+
+	trim() {
+		this.onNFA('trim');
 	}
 
 	undo() {
@@ -258,7 +269,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 				return;
 			}
 		}
-		this.handle('setTransitionTarget', ...arguments);
+		this.onNFA('setTransitionTarget', ...arguments);
 	}
 
 	render() {
@@ -322,7 +333,11 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 							<tbody>
 							{presets.map((preset, index) => (
 								<tr key={index}>
-									<td>{preset.description}</td>
+									<td>
+										<p>{preset.description}</p>
+										<p>E.g. {preset.examples.join(", ")}</p>
+										<p>Regex: {preset.regex}</p>
+									</td>
 									<td>
 										<button className="btn btn-default" onClick={() => this.loadPreset(index)}>Load</button>
 									</td>
@@ -334,6 +349,25 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 					<div style={this.displayIf(this.state.tab === 'transform')}>
 						<button className="btn btn-default" disabled={nfa.isDFA} title={nfa.isDFA ? "Your NFA is already a DFA." : ""}>
 							Convert to DFA
+						</button>
+						<br/>
+						<br/>
+						<button
+							className="btn btn-default"
+							disabled={nfa.isTrimmed}
+							title="Remove nongenerating and unreachable states."
+							onClick={() => this.trim()}
+						>
+							Trim
+						</button>
+						<br/>
+						<br/>
+						<button
+							className="btn btn-default"
+							title="Make all states transition on all symbols."
+							onClick={() => this.complete()}
+						>
+							Complete
 						</button>
 					</div>
 					<div style={this.displayIf(this.state.tab === 'port')}>

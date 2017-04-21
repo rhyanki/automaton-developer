@@ -33,7 +33,7 @@ export {SymbolGroup};
 export default class NFA {
 	static nextID: number = 1;
 
-	protected _alphabet: SymbolGroup;
+	protected _alphabet?: SymbolGroup; // The set alphabet, or undefined if alphabet is implicit
 	protected _states: Set<State>;
 	protected _start: State;
 	protected _names: Map<State, string>;
@@ -45,6 +45,7 @@ export default class NFA {
 	protected _cache: {
 		generatingStates?: Set<State>,
 		isDFA?: boolean,
+		minimalAlphabet?: SymbolGroup,
 		reachableStates?: Set<State>,
 		willAccept?: boolean,
 	};
@@ -141,7 +142,9 @@ export default class NFA {
 		}
 
 		// Parse alphabet
-		this._alphabet = this.minimalAlphabet(definition.alphabet);
+		if (definition.alphabet) {
+			this._alphabet = this.minimalAlphabet(definition.alphabet);
+		}
 
 		// Immutable by default
 		if (!mutable) {
@@ -188,6 +191,9 @@ export default class NFA {
 	 * Get the alphabet.
 	 */
 	get alphabet(): SymbolGroup {
+		if (!this._alphabet) {
+			return this.minimalAlphabet();
+		}
 		return this._alphabet;
 	}
 
@@ -206,6 +212,13 @@ export default class NFA {
 			this._cache.generatingStates.asImmutable();
 		}
 		return this._cache.generatingStates;
+	}
+
+	/**
+	 * Whether the NFA has an explicit/set or implicit/unset alphabet.
+	 */
+	get hasSetAlphabet() {
+		return this._alphabet !== undefined;
 	}
 
 	/**
@@ -231,6 +244,24 @@ export default class NFA {
 			this._cache.isDFA = true;
 		}
 		return this._cache.isDFA;
+	}
+
+	/**
+	 * Whether the NFA is trimmed (has no unreachable or nongenerating states except the start state).
+	 */
+	get isTrimmed(): boolean {
+		let numUnreachable = this.numStates - this.reachableStates.size;
+		if (numUnreachable !== 0) {
+			return false;
+		}
+		let numNongenerating = this.numStates - this.generatingStates.size;
+		if (!this.generating(this._start)) {
+			numNongenerating--;
+		}
+		if (numNongenerating !== 0) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -295,6 +326,45 @@ export default class NFA {
 		nfa._names = nfa._names.asMutable().set(id, name);
 		nfa._transitions = nfa._transitions.asMutable().set(id, <TransitionGroup> Map().asMutable());
 
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
+	 * Complete the NFA, such that the transition function is complete - i.e., every state transitions
+	 * on every symbol in the alphabet. Add an extra nongenerating state if necessary.
+	 */
+	complete(): this {
+		const nfa = this.mutable(true);
+
+		let nongenerating = 0;
+		if (nfa.generatingStates.size !== nfa.numStates) {
+			for (const state of nfa._states) {
+				if (!nfa.generating(state)) {
+					nongenerating = state;
+				}
+			}
+		}
+		if (!nongenerating) {
+			nongenerating = NFA.nextID;
+			nfa.addState("Reject");
+		}
+		let modified = false;
+		for (const origin of nfa._states) {
+			const remainingSymbols = nfa.alphabet.subtract(nfa.symbolsFrom(origin));
+			if (remainingSymbols.size !== 0) {
+				nfa.setTransition(origin, nongenerating, remainingSymbols);
+				modified = true;
+			}
+		}
+		if (!modified) {
+			return this;
+		}
+		if (nfa._cache.reachableStates) {
+			nfa._cache.reachableStates = nfa._cache.reachableStates.add(nongenerating);
+		}
 		if (!this._mutable) {
 			nfa.immutable();
 		}
@@ -381,14 +451,16 @@ export default class NFA {
 	 * @param include If provided, these symbols will also be included in the resultant alphabet.
 	 */
 	minimalAlphabet(include?: SymbolGroupInput): SymbolGroup {
-		const allSymbolGroups = [];
-		for (const origin of this._states) {
-			for (const [, symbols] of this.transitionsFrom(origin)) {
-				allSymbolGroups.push(symbols);
+		if (!this._cache.minimalAlphabet) {
+			const allSymbolGroups = [];
+			for (const origin of this._states) {
+				for (const [, symbols] of this.transitionsFrom(origin)) {
+					allSymbolGroups.push(symbols);
+				}
 			}
+			this._cache.minimalAlphabet = SymbolGroup.merge(allSymbolGroups);
 		}
-		allSymbolGroups.push(include);
-		return SymbolGroup.merge(allSymbolGroups);
+		return this._cache.minimalAlphabet.merge(include);
 	}
 
 	/**
@@ -534,10 +606,9 @@ export default class NFA {
 	 */
 	setAlphabet(alphabet: SymbolGroupInput): NFA {
 		const newAlphabet = this.minimalAlphabet(alphabet);
-		if (this._alphabet.equals(newAlphabet)) {
+		if (this.hasSetAlphabet && this.alphabet.equals(newAlphabet)) {
 			return this;
 		}
-
 		const nfa = this.mutable(true);
 		nfa._alphabet = newAlphabet;
 
@@ -617,8 +688,10 @@ export default class NFA {
 		const cache = this._cache;
 		const nfa = this.mutable();
 
-		// The NFA's alphabet should be automatically updated to accommodate any new symbols
-		nfa._alphabet = nfa._alphabet.merge(symbols);
+		if (nfa._alphabet) {
+			// The NFA's alphabet should be automatically updated to accommodate any new symbols
+			nfa._alphabet = nfa._alphabet.merge(symbols);
+		}
 
 		// hasTransition() above guarantees that this is not undefined
 		const transitions = (<TransitionGroup> nfa._transitions.get(origin)).asMutable();
@@ -695,6 +768,17 @@ export default class NFA {
 	}
 
 	/**
+	 * Return all the symbols on which the given state transitions.
+	 */
+	symbolsFrom(origin: State): SymbolGroup {
+		const allGroups = [];
+		for (const [, symbols] of this.transitionsFrom(origin)) {
+			allGroups.push(symbols);
+		}
+		return SymbolGroup.merge(allGroups);
+	}
+
+	/**
 	 * Get a definition of the NFA, easily convertable to JSON and parseable by the constructor.
 	 */
 	toDefinition(): Definition {
@@ -732,13 +816,16 @@ export default class NFA {
 			transitions.push(transitionsFrom);
 		}
 		
-		return {
+		const ret = {
 			n: this.numStates,
-			alphabet: this._alphabet.toString(" ", false),
 			accept: accept,
 			names: names,
 			transitions: transitions,
-		};
+		} as Definition;
+		if (this.hasSetAlphabet) {
+			ret.alphabet = this.alphabet.toString(" ", false);
+		}
+		return ret;
 	}
 
 	/**
@@ -754,5 +841,45 @@ export default class NFA {
 	transitionsFrom(origin: State): TransitionGroup {
 		origin = this.state(origin);
 		return this._transitions.get(origin) || <TransitionGroup> Map();
+	}
+
+	/**
+	 * Remove non-generating and unreachable states from the DFA (except the start state).
+	 */
+	trim(): this {
+		if (this.isTrimmed) {
+			return this;
+		}
+		const nfa = this.mutable(true);
+
+		for (const state of nfa._states) {
+			if (nfa.generating(state) && nfa.reachable(state)) {
+				continue;
+			}
+			if (nfa.isStart(state)) {
+				continue;
+			}
+			nfa.removeState(state);
+		}
+
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
+	}
+
+	/**
+	 * Unset the alphabet, making it implicit.
+	 */
+	unsetAlphabet(): this {
+		if (!this.hasSetAlphabet) {
+			return this;
+		}
+		const nfa = this.mutable(true);
+		nfa._alphabet = undefined;
+		if (!this._mutable) {
+			nfa.immutable();
+		}
+		return nfa;
 	}
 }

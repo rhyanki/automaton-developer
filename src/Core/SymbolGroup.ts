@@ -31,7 +31,7 @@ class CharRange {
 	}
 
 	get size(): number {
-		return this._end - this._start;
+		return this._end - this._start + 1;
 	}
 
 	/**
@@ -83,7 +83,7 @@ export {allowedRanges};
 
 // All parameters which ask for a symbol group should also be able to accept an input string
 // which can be converted to one.
-export type SymbolGroupInput = SymbolGroup | string | undefined;
+export type SymbolGroupInput = SymbolGroup | string | Set<Symbol> | undefined;
 
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
@@ -149,7 +149,7 @@ export default class SymbolGroup {
 	 * - ~ is an alias for ε (no symbol).
 	 * @param delimiter The delimiter to recognize. Will be parsed as a regex.
 	 */
-	constructor(input?: string | SymbolGroup, delimiter: string = " ") {
+	constructor(input?: SymbolGroupInput, delimiter: string = " ") {
 		if (input === undefined) {
 			this._symbols = OrderedSet();
 			this._normalized = "";
@@ -160,61 +160,67 @@ export default class SymbolGroup {
 			return input;
 		}
 
-		// Unicode normalize the string, combining as many characters as possible
-		input = input.normalize();
+		let symbols;
+		if (typeof input === 'string') {
+			// Unicode normalize the string, combining as many characters as possible
+			input = input.normalize();
 
-		const symbols = Set<Symbol>().asMutable();
+			symbols = Set<Symbol>().asMutable();
 
-		// Compile a regex for the delimiter
-		const delimiterRegex = new RegExp("^" + delimiter);
+			// Compile a regex for the delimiter
+			const delimiterRegex = new RegExp("^" + delimiter);
 
-		mainLoop: while (input.length > 0) {
-			let matches;
+			mainLoop: while (input.length > 0) {
+				let matches;
 
-			// First try to match the delimiter
-			matches = input.match(delimiterRegex);
-			if (matches && matches[0].length !== 0) {
-				input = input.substr(matches[0].length);
-				continue;
-			}
+				// First try to match the delimiter
+				matches = input.match(delimiterRegex);
+				if (matches && matches[0].length !== 0) {
+					input = input.substr(matches[0].length);
+					continue;
+				}
 
-			// Try to match a character range
-			matches = input.match(/^.-./);
-			if (matches) {
-				const range = new CharRange(matches[0]);
-				for (const allowedRange of allowedRanges) {
-					if (allowedRange.contains(range)) {
-						for (const symbol of range) {
-							symbols.add(symbol);
+				// Try to match a character range
+				matches = input.match(/^.-./);
+				if (matches) {
+					const range = new CharRange(matches[0]);
+					for (const allowedRange of allowedRanges) {
+						if (allowedRange.contains(range)) {
+							for (const symbol of range) {
+								symbols.add(symbol);
+							}
+							input = input.substr(matches[0].length);
+							continue mainLoop;
 						}
-						input = input.substr(matches[0].length);
-						continue mainLoop;
 					}
+				}
+
+				// Try to match a character or backslash sequence
+				matches = input.match(/^\\?./);
+				if (matches) {
+					let match = matches[0];
+					const special = _fromSpecial.get(match);
+					if (special) {
+						symbols.add(special);
+					} else {
+						// If there is still a backslash, remove it and use the raw character
+						if (match.length > 1 && match[0] === "\\") {
+							match = match[1];
+						}
+						symbols.add(match);
+					}
+					input = input.substr(match.length);
+					continue;
 				}
 			}
 
-			// Try to match a character or backslash sequence
-			matches = input.match(/^\\?./);
-			if (matches) {
-				let match = matches[0];
-				const special = _fromSpecial.get(match);
-				if (special) {
-					symbols.add(special);
-				} else {
-					// If there is still a backslash, remove it and use the raw character
-					if (match.length > 1 && match[0] === "\\") {
-						match = match[1];
-					}
-					symbols.add(match);
-				}
-				input = input.substr(match.length);
-				continue;
+			// Special case: if there are otherwise no symbols, consider it to be the empty transition symbol
+			if (symbols.size === 0) {
+				symbols.add("");
 			}
-		}
-
-		// Special case: if there are otherwise no symbols, consider it to be the empty transition symbol
-		if (symbols.size === 0) {
-			symbols.add("");
+		} else {
+			// If the input is a set, assume that set is the set of symbols.
+			symbols = input;
 		}
 
 		this._symbols = symbols.sort() as OrderedSet<Symbol>;
@@ -265,6 +271,22 @@ export default class SymbolGroup {
 	}
 
 	/**
+	 * Subtract any number of symbol groups from this one.
+	 */
+	subtract(...others: SymbolGroupInput[]): SymbolGroup {
+		let allSymbols = this._symbols.asMutable();
+		for (const other of others) {
+			const otherSymbols = new SymbolGroup(other)._symbols;
+			allSymbols = allSymbols.subtract(otherSymbols);
+		}
+		const newGroup = new SymbolGroup(allSymbols);
+		if (newGroup.equals(this)) {
+			return this;
+		}
+		return newGroup;
+	}
+
+	/**
 	 * @param delimiter
 	 * @param includeEmpty Whether to include ε in the output.
 	 */
@@ -294,8 +316,8 @@ export default class SymbolGroup {
 			const finalRange = new CharRange(rangeStart, rangeEnd);
 			const rangeLen = finalRange.toString().length;
 			const otherwiseLen = finalRange.size + (finalRange.size - 1) * delimiter.length;
-			if (rangeLen < otherwiseLen) {
-				// Only output the character range if it would actually save space
+			if (rangeLen < otherwiseLen && finalRange.size > 2) {
+				// Only output the character range if it would actually save space (and it has 3 or more chars)
 				blocks.push(finalRange.toString());
 			} else {
 				for (const s of finalRange) {

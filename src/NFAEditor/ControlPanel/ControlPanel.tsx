@@ -56,7 +56,10 @@ export default class ControlPanel extends React.PureComponent<CProps, null> {
 						Stop
 					</button>
 					<label>Alphabet: </label>
-					<span className="click-editable" onClick={() => this.props.editAlphabet()}>
+					<span
+						className={"click-editable" + (nfa.hasSetAlphabet ? "" : " implicit-alphabet")}
+						onClick={() => this.props.editAlphabet()}
+					>
 						{nfa.alphabet.toString(", ", false)}
 					</span>
 				</form>
