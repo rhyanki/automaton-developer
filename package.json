@@ -1,22 +1,23 @@
 {
-  "name": "my-app",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "@types/jest": "^19.2.2",
-    "@types/node": "^7.0.12",
-    "@types/react": "^15.0.21",
-    "@types/react-dom": "^0.14.23",
-    "react": "^15.5.3",
-    "react-dom": "^15.5.3"
-  },
-  "devDependencies": {
-    "react-scripts-ts": "1.1.8"
-  },
-  "scripts": {
-    "start": "react-scripts-ts start",
-    "build": "react-scripts-ts build",
-    "test": "react-scripts-ts test --env=jsdom",
-    "eject": "react-scripts-ts eject"
-  }
+	"name": "automaton-developer",
+	"version": "0.1.0",
+	"private": true,
+	"dependencies": {
+		"@types/jest": "^19.2.2",
+		"@types/node": "^7.0.12",
+		"@types/react": "^15.0.21",
+		"@types/react-dom": "^0.14.23",
+		"react": "^15.5.3",
+		"react-dom": "^15.5.3"
+	},
+	"devDependencies": {
+		"react-scripts-ts": "1.1.8"
+	},
+	"scripts": {
+		"start": "react-scripts-ts start",
+		"build": "react-scripts-ts build",
+		"test": "react-scripts-ts test --env=jsdom",
+		"eject": "react-scripts-ts eject"
+	},
+	"homepage": "."
 }

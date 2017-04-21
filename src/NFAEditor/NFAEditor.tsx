@@ -3,7 +3,7 @@ import {List, OrderedMap} from 'immutable';
 
 import RunnableNFA, {State} from '../Core/RunnableNFA';
 import SymbolGroup, {allowedRanges} from '../Core/SymbolGroup';
-//import ListEditor from './ListEditor/ListEditor';
+// import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
 import TestInputEditor from './TestInputEditor/TestInputEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
