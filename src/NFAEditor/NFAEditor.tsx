@@ -3,17 +3,17 @@ import {List, OrderedMap} from 'immutable';
 
 import RunnableNFA, {State} from '../Core/RunnableNFA';
 import SymbolGroup, {allowedRanges} from '../Core/SymbolGroup';
-import ListEditor from './ListEditor/ListEditor';
+//import ListEditor from './ListEditor/ListEditor';
 import VisualEditor from './VisualEditor/VisualEditor';
 import TestInputEditor from './TestInputEditor/TestInputEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
 import presets from './presets';
 import './NFAEditor.css';
 
-const _editors = OrderedMap([
+/*const _editors = OrderedMap([
 	['visual', "Visual Editor"],
 	['list', "List Editor"]],
-) as OrderedMap<EditorType, string>;
+) as OrderedMap<EditorType, string>;*/
 
 const _tabs = OrderedMap([
 	['instructions', "Instructions"],
@@ -278,7 +278,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 		return ((
 			<div className="row">
 				<div className="col-md-3">
-					<select
+					{/*<select
 						className="form-control"
 						value={editor}
 						onChange={(e) => this.switchEditor(e.target.value as EditorType)}
@@ -287,7 +287,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 							<option key={key} value={key}>{name}</option>
 						))}
 					</select>
-					<br/>
+					<br/>*/}
 					<ul className="nav nav-pills">
 						{_tabs.map((name, key) => (
 							<li
@@ -412,7 +412,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 						/>
 					</div>
 					<br/>
-					<div className="editor" style={this.displayIf(editor === 'list')}>
+					{/*<div className="editor" style={this.displayIf(editor === 'list')}>
 						<ListEditor
 							nfa={nfa}
 							promptUpdateTransitionSymbols={this.promptUpdateTransitionSymbols}
@@ -421,7 +421,7 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 							toggleAccept={this.toggleAccept}
 							updateTransitionTarget={this.updateTransitionTarget}
 						/>
-					</div>
+					</div>*/}
 					<div className="editor" style={this.displayIf(editor === 'visual')}>
 						<VisualEditor
 							ref={(ref) => this._visualEditor = ref}
