@@ -12,8 +12,8 @@ import './NFAEditor.css';
 
 /*const _editors = OrderedMap([
 	['visual', "Visual Editor"],
-	['list', "List Editor"]],
-) as OrderedMap<EditorType, string>;*/
+	['list', "List Editor"],
+] as [EditorType, string][]);*/
 
 const _tabs = OrderedMap([
 	['instructions', "Instructions"],
@@ -21,7 +21,7 @@ const _tabs = OrderedMap([
 	['presets', "Presets"],
 	['transform', "Transform"],
 	['port', "Import/Export"],
-]) as OrderedMap<Tab, string>;
+] as [Tab, string][]);
 
 const EDIT_SYMBOLS_DELIMITER = " ";
 
@@ -36,9 +36,8 @@ type CState = {
 type EditorType = 'visual' | 'list';
 type Tab = 'test' | 'presets' | 'instructions' | 'transform' | 'port';
 
-export default class NFAEditor extends React.PureComponent<null, CState> {
-	_visualEditor: VisualEditor;
-	history: RunnableNFA[];
+export default class NFAEditor extends React.PureComponent<CProps, CState> {
+	private history: RunnableNFA[];
 
 	constructor() {
 		super();
@@ -53,223 +52,11 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 			testInputs: List([""]),
 		};
 
-		(window as any).nfa = this.state.nfa; // For debugging
-
-		// Bind all methods to this
-		for (const methodName of Object.getOwnPropertyNames(this.constructor.prototype)) {
-			if (this[methodName] instanceof Function) {
-				this[methodName] = this[methodName].bind(this);
-			}
-		}
+		// (window as any).nfa = this.state.nfa; // For debugging
 	}
 
 	componentDidUpdate(prevProps: CProps, prevState: CState) {
-		console.log("NFAEditor updated.");
-		(window as any).nfa = this.state.nfa; // For debugging
-	}
-
-	addState(name?: string) {
-		this.onNFA('addState', name);
-	}
-
-	back() {
-		this.undo();
-	}
-
-	/**
-	 * Clear the editor, replacing the NFA with a blank one.
-	 */
-	clear() {
-		this.setState({
-			nfa: new RunnableNFA({
-				n: 1,
-				names: ["Start"],
-			})
-		});
-	}
-
-	complete() {
-		this.onNFA('complete');
-	}
-
-	confirmRemoveState(state: State) {
-		if (!window.confirm("Are you sure you want to delete this state?")) {
-			return;
-		}
-		this.onNFA('removeState', ...arguments);
-	}
-
-	confirmRemoveTransition(origin: State, target: State) {
-		if (!window.confirm("Are you sure you want to delete this transition?")) {
-			return;
-		}
-		this.onNFA('removeTransition', ...arguments);
-	}
-
-	/**
-	 * Simple wrapper to set the style of a react element as display: block or display: none.
-	 */
-	displayIf(condition: boolean): React.CSSProperties {
-		return {
-			display: (condition ? 'block' : 'none'),
-		};
-	}
-
-	editAlphabet() {
-		const input = window.prompt(
-			"Enter a new alphabet (leave blank for implicit).",
-			this.state.nfa.hasSetAlphabet ? this.state.nfa.alphabet.toString(EDIT_SYMBOLS_DELIMITER, false) : ""
-		);
-		if (input === null) {
-			return;
-		}
-		if (input === "") {
-			return this.onNFA('unsetAlphabet');
-		}
-		return this.onNFA('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
-	}
-
-	exportValue(): string {
-		return JSON.stringify({
-			nfa: this.state.nfa.toDefinition(),
-		});
-	}
-
-	import() {
-		this.setState((prevState) => {
-			try {
-				return {
-					importing: "",
-					nfa: new RunnableNFA(JSON.parse(prevState.importing).nfa),
-				};
-			} catch (e) {
-				window.alert("Invalid input.");
-				return;
-			}
-		});
-	}
-
-	loadPreset(index: number) {
-		this.setState({
-			nfa: new RunnableNFA(presets[index].definition),
-		});
-	}
-
-	/**
-	 * Update the NFAEditor's state with a new NFA, based on the result of calling one of the NFA's methods.
-	 * @param methodName The name of the NFA method to call.
-	 * @param args The args to pass to the NFA method call.
-	 */
-	onNFA(methodName: string, ...args: any[]): void {
-		this.setState((prevState, props) => {
-			if (!(prevState.nfa[methodName] instanceof Function)) {
-				console.log(methodName + " is not a valid NFA method!");
-				throw new Error(methodName + " is not a valid NFA method!");
-			}
-			try {
-				const newNFA = prevState.nfa[methodName](...args);
-				if (newNFA !== prevState.nfa) {
-					this.history.push(prevState.nfa);
-				}
-				return {
-					nfa: newNFA,
-				};
-			} catch (e) {
-				window.alert(e.message);
-				return;
-			}
-		});
-	}
-
-	promptAddTransition(origin: State, target: State) {
-		this.promptUpdateTransitionSymbols(origin, target);
-	}
-
-	promptEditState(state: State) {
-		const newName = window.prompt("Enter a state name.", this.state.nfa.name(state));
-		if (newName) {
-			this.setName(state, newName);
-		}
-	}
-
-	promptUpdateTransitionSymbols(origin: State, target: State) {
-		const symbols = window.prompt(
-			"Enter a new symbol or symbols.",
-			this.state.nfa.symbols(origin, target).toString(EDIT_SYMBOLS_DELIMITER)
-		);
-		if (symbols === null) {
-			return;
-		}
-		this.onNFA('setTransition', origin, target, new SymbolGroup(symbols, EDIT_SYMBOLS_DELIMITER));
-	}
-
-	reset(input?: string) {
-		this.onNFA('reset', input);
-	}
-
-	run() {
-		this.onNFA('run');
-	}
-
-	setImporting(contents: string) {
-		console.log("Updated importing");
-		this.setState({
-			importing: contents,
-		});
-	}
-
-	setInput(input: string) {
-		this.onNFA('setInput', ...arguments);
-	}
-
-	setName(state: State, name: string) {
-		this.onNFA('setName', ...arguments);
-	}
-
-	setStart(state: State) {
-		this.onNFA('setStart', ...arguments);
-	}
-
-	step() {
-		this.onNFA('step');
-	}
-
-	stop() {
-		this.onNFA('stop');
-	}
-
-	switchEditor(editor: EditorType) {
-		this.setState({editor: editor});
-	}
-
-	switchTab(tab: Tab) {
-		this.setState({tab: tab});
-	}
-
-	toggleAccept(state: State) {
-		this.onNFA('toggleAccept', ...arguments);
-	}
-
-	trim() {
-		this.onNFA('trim');
-	}
-
-	undo() {
-		if (this.history.length > 0) {
-			this.setState({
-				nfa: this.history.pop() as RunnableNFA,
-			});
-		}
-	}
-
-	updateTransitionTarget(origin: State, oldTarget: State, newTarget: State) {
-		if (this.state.nfa.hasTransition(origin, newTarget)) {
-			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions.\
-				Do you wish to continue?")) {
-				return;
-			}
-		}
-		this.onNFA('setTransitionTarget', ...arguments);
+		// (window as any).nfa = this.state.nfa; // For debugging
 	}
 
 	render() {
@@ -424,7 +211,6 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 					</div>*/}
 					<div className="editor" style={this.displayIf(editor === 'visual')}>
 						<VisualEditor
-							ref={(ref) => this._visualEditor = ref}
 							nfa={nfa}
 							confirmRemoveState={this.confirmRemoveState}
 							confirmRemoveTransition={this.confirmRemoveTransition}
@@ -438,5 +224,209 @@ export default class NFAEditor extends React.PureComponent<null, CState> {
 				</div>
 			</div>
 		));
+	}
+
+	addState = (name?: string) => {
+		this.onNFA('addState', name);
+	}
+
+	back = () => {
+		this.undo();
+	}
+
+	/**
+	 * Clear the editor, replacing the NFA with a blank one.
+	 */
+	clear = () => {
+		this.setState({
+			nfa: new RunnableNFA({
+				n: 1,
+				names: ["Start"],
+			})
+		});
+	}
+
+	complete = () => {
+		this.onNFA('complete');
+	}
+
+	confirmRemoveState = (state: State) => {
+		if (!window.confirm("Are you sure you want to delete this state?")) {
+			return;
+		}
+		this.onNFA('removeState', ...arguments);
+	}
+
+	confirmRemoveTransition = (origin: State, target: State) => {
+		if (!window.confirm("Are you sure you want to delete this transition?")) {
+			return;
+		}
+		this.onNFA('removeTransition', ...arguments);
+	}
+
+	/**
+	 * Simple wrapper to set the style of a react element as display: block or display: none.
+	 */
+	displayIf = (condition: boolean): React.CSSProperties => {
+		return {
+			display: (condition ? 'block' : 'none'),
+		};
+	}
+
+	editAlphabet = () => {
+		const input = window.prompt(
+			"Enter a new alphabet (leave blank for implicit).",
+			this.state.nfa.hasSetAlphabet ? this.state.nfa.alphabet.toString(EDIT_SYMBOLS_DELIMITER, false) : ""
+		);
+		if (input === null) {
+			return;
+		}
+		if (input === "") {
+			return this.onNFA('unsetAlphabet');
+		}
+		return this.onNFA('setAlphabet', new SymbolGroup(input, EDIT_SYMBOLS_DELIMITER));
+	}
+
+	exportValue = (): string => {
+		return JSON.stringify({
+			nfa: this.state.nfa.toDefinition(),
+		});
+	}
+
+	import = () => {
+		this.setState((prevState) => {
+			try {
+				return {
+					importing: "",
+					nfa: new RunnableNFA(JSON.parse(prevState.importing).nfa),
+				};
+			} catch (e) {
+				window.alert("Invalid input.");
+				return;
+			}
+		});
+	}
+
+	loadPreset = (index: number) => {
+		this.setState({
+			nfa: new RunnableNFA(presets[index].definition),
+		});
+	}
+
+	/**
+	 * Update the NFAEditor's state with a new NFA, based on the result of calling one of the NFA's methods.
+	 * @param methodName The name of the NFA method to call.
+	 * @param args The args to pass to the NFA method call.
+	 */
+	onNFA = (methodName: string, ...args: any[]): void => {
+		this.setState((prevState, props) => {
+			if (!(prevState.nfa[methodName] instanceof Function)) {
+				console.log(methodName + " is not a valid NFA method!");
+				throw new Error(methodName + " is not a valid NFA method!");
+			}
+			try {
+				const newNFA = prevState.nfa[methodName](...args);
+				if (newNFA !== prevState.nfa) {
+					this.history.push(prevState.nfa);
+				}
+				return {
+					nfa: newNFA,
+				};
+			} catch (e) {
+				window.alert(e.message);
+				return;
+			}
+		});
+	}
+
+	promptAddTransition = (origin: State, target: State) => {
+		this.promptUpdateTransitionSymbols(origin, target);
+	}
+
+	promptEditState = (state: State) => {
+		const newName = window.prompt("Enter a state name.", this.state.nfa.name(state));
+		if (newName) {
+			this.setName(state, newName);
+		}
+	}
+
+	promptUpdateTransitionSymbols = (origin: State, target: State) => {
+		const symbols = window.prompt(
+			"Enter a new symbol or symbols.",
+			this.state.nfa.symbols(origin, target).toString(EDIT_SYMBOLS_DELIMITER)
+		);
+		if (symbols === null) {
+			return;
+		}
+		this.onNFA('setTransition', origin, target, new SymbolGroup(symbols, EDIT_SYMBOLS_DELIMITER));
+	}
+
+	reset = (input?: string) => {
+		this.onNFA('reset', input);
+	}
+
+	run = () => {
+		this.onNFA('run');
+	}
+
+	setImporting = (contents: string) => {
+		console.log("Updated importing");
+		this.setState({
+			importing: contents,
+		});
+	}
+
+	setInput = (input: string) => {
+		this.onNFA('setInput', ...arguments);
+	}
+
+	setName = (state: State, name: string) => {
+		this.onNFA('setName', ...arguments);
+	}
+
+	setStart = (state: State) => {
+		this.onNFA('setStart', ...arguments);
+	}
+
+	step = () => {
+		this.onNFA('step');
+	}
+
+	stop = () => {
+		this.onNFA('stop');
+	}
+
+	switchEditor = (editor: EditorType) => {
+		this.setState({editor: editor});
+	}
+
+	switchTab = (tab: Tab) => {
+		this.setState({tab: tab});
+	}
+
+	toggleAccept = (state: State) => {
+		this.onNFA('toggleAccept', ...arguments);
+	}
+
+	trim = () => {
+		this.onNFA('trim');
+	}
+
+	undo = () => {
+		if (this.history.length > 0) {
+			this.setState({
+				nfa: this.history.pop() as RunnableNFA,
+			});
+		}
+	}
+
+	updateTransitionTarget = (origin: State, oldTarget: State, newTarget: State) => {
+		if (this.state.nfa.hasTransition(origin, newTarget)) {
+			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions.\
+				Do you wish to continue?")) {
+				return;
+			}
+		}
+		this.onNFA('setTransitionTarget', ...arguments);
 	}
 }

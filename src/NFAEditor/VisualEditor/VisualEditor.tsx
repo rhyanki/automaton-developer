@@ -54,10 +54,6 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		this.resetPositions();
 	}
 
-	componentDidUpdate() {
-		console.log("VisualEditor updated.");
-	}
-
 	componentWillReceiveProps(nextProps: CProps) {
 		if (this.props.nfa.states === nextProps.nfa.states) {
 			return;
@@ -79,9 +75,46 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		}
 	}
 
+	render() {
+		const nfa = this.props.nfa;
+		return (
+			<div className="VisualEditor">
+				<svg
+					ref={(svg) => this.svg = svg}
+					width="100%"
+					height="100%"
+					onMouseMove={(e) => this.onMouseMove(e)}
+					onMouseLeave={() => this.onMouseLeave()}
+					onMouseUp={(e) => this.onMouseUp(e)}
+				>
+					{this.renderTransitions()}
+					{nfa.states.map((state) => (
+						<g
+							key={state}
+							transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
+						>
+							<VisualState
+								nfa={nfa}
+								state={state}
+								radius={this.STATE_RADIUS}
+								onMouseDown={(e) => this.onMouseDownState(e, state)}
+								onMouseEnter={(e) => this.onMouseEnterState(e, state)}
+								onMouseLeave={() => this.onMouseLeaveState()}
+								promptEditName={() => this.props.promptEditState(state)}
+								remove={() => this.props.confirmRemoveState(state)}
+								setStart={() => this.props.setStart(state)}
+								toggleAccept={() => this.props.toggleAccept(state)}
+							/>
+						</g>
+					))}
+				</svg>
+			</div>
+		);
+	}
+
 	/**
 	 * Start dragging a state.
-	 * @param cursorPos  Initial cursor position.
+	 * @param cursorPos Initial cursor position.
 	 */
 	dragStateStart(state: State, cursorPos: Vector) {
 		this.setState({
@@ -142,7 +175,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 
 	/**
 	 * Continue drawing a transition.
-	 * @param cursorPos  The current cursor position.
+	 * @param cursorPos The current cursor position.
 	 */
 	drawTransitionContinue(cursorPos: Vector) {
 		if (!this.isDrawingTransition()) {
@@ -153,8 +186,8 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 
 	/**
 	 * Start drawing (or moving) a transition.
-	 * @param origin  The origin state.
-	 * @param cursorPos  The initial cursor position.
+	 * @param origin The origin state.
+	 * @param cursorPos The initial cursor position.
 	 */
 	drawTransitionStart(origin: State, cursorPos: Vector) {
 		this.setState({
@@ -166,7 +199,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 
 	/**
 	 * Set a target for the transition being drawn.
-	 * @param target  The new target (0 for no target).
+	 * @param target The new target (0 for no target).
 	 */
 	drawTransitionSetTarget(target: State) {
 		if (!this.isDrawingTransition()) {
@@ -466,43 +499,6 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		}
 
 		return output;
-	}
-
-	render() {
-		const nfa = this.props.nfa;
-		return (
-			<div className="VisualEditor">
-				<svg
-					ref={(svg) => this.svg = svg}
-					width="100%"
-					height="100%"
-					onMouseMove={(e) => this.onMouseMove(e)}
-					onMouseLeave={() => this.onMouseLeave()}
-					onMouseUp={(e) => this.onMouseUp(e)}
-				>
-					{this.renderTransitions()}
-					{nfa.states.map((state) => (
-						<g
-							key={state}
-							transform={"translate(" + this.x(state) + ", " + this.y(state) + ")"}
-						>
-							<VisualState
-								nfa={nfa}
-								state={state}
-								radius={this.STATE_RADIUS}
-								onMouseDown={(e) => this.onMouseDownState(e, state)}
-								onMouseEnter={(e) => this.onMouseEnterState(e, state)}
-								onMouseLeave={() => this.onMouseLeaveState()}
-								promptEditName={() => this.props.promptEditState(state)}
-								remove={() => this.props.confirmRemoveState(state)}
-								setStart={() =>  this.props.setStart(state)}
-								toggleAccept={() =>  this.props.toggleAccept(state)}
-							/>
-						</g>
-					))}
-				</svg>
-			</div>
-		);
 	}
 }
 

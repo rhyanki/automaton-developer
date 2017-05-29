@@ -3,15 +3,24 @@ import {Vector, normalizeAngle, perpendicularOffset, quadraticCurveAt} from '../
 import {defaults} from '../../Util/general';
 
 type CProps = {
-	start: Vector,		// The start position.
-	end: Vector,		// The end position.
-	control?: Vector,	// The control point (defaults to the midpoint of start and end - i.e., a straight line).
-	radius?: number,	// If provided, the arrow will be an arc from start to end with the given radius.
-	arrowHeadT?: number,	// The t value (t from 0 to 1) at which to draw the arrowhead.
-	label?: string,		// The label text.
-	onClickShaft?: React.EventHandler<React.MouseEvent<any>>, // Handler for when the shaft is clicked.
-	onClickLabel?: React.EventHandler<React.MouseEvent<any>>, // Handler for when the label is clicked.
-	className?: string,	// The classname for the main <g>.
+	/** The start position. */
+	start: Vector,
+	/** The end position. */
+	end: Vector,
+	/** The control point (defaults to the midpoint of start and end - i.e., a straight line). */
+	control?: Vector,
+	/** If provided, the arrow will be an arc from start to end with the given radius. */
+	radius?: number,
+	/** The t value (t from 0 to 1) at which to draw the arrowhead. */
+	arrowHeadT?: number,
+	/** The label text. */
+	label?: string,
+	/** Handler for when the shaft is clicked. */
+	onClickShaft?: React.EventHandler<React.MouseEvent<any>>,
+	/** Handler for when the label is clicked. */
+	onClickLabel?: React.EventHandler<React.MouseEvent<any>>,
+	/** The classname for the main <g>. */
+	className?: string,
 };
 
 /**
@@ -21,10 +30,10 @@ type CProps = {
 class LabelledArrow extends React.PureComponent<CProps, null> {
 	/**
 	 * Return a polyline consisting of two short lines in the shape of an arrowhead.
-	 * @param pos  The position of the tip of the arrow.
-	 * @param angle  The angle at which the arrow is pointing. 0 = left, π/2 = down.
-	 * @param size  The length of each line.
-	 * @param theta  The angle between the arrow's lines. Should be less than π.
+	 * @param pos The position of the tip of the arrow.
+	 * @param angle The angle at which the arrow is pointing. 0 = left, π/2 = down.
+	 * @param size The length of each line.
+	 * @param theta The angle between the arrow's lines. Should be less than π.
 	 */
 	renderArrowHead(pos: Vector, angle: number, size: number = 10, theta: number = Math.PI / 3) {
 		const t1 = angle - theta / 2;

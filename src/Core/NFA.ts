@@ -156,9 +156,9 @@ export default class NFA {
 
 	/**
 	 * Perform a DFS from (and including) the given state on its transitions.
-	 * @param state  The state to start from. If it has been visited already, _explore() will do nothing.
-	 * @param visited  The set of visited states. Must be mutable (and will be modified).
-	 * @param backwards  Whether to go backwards (so states that transition TO the given state will be explored instead).
+	 * @param state The state to start from. If it has been visited already, _explore() will do nothing.
+	 * @param visited The set of visited states. Must be mutable (and will be modified).
+	 * @param backwards Whether to go backwards (so states that transition TO the given state will be explored instead).
 	 */
 	protected _explore(state: State, visited: Set<State>, backwards?: boolean): Set<State> {
 		backwards = backwards || false;
@@ -309,7 +309,7 @@ export default class NFA {
 
 	/**
 	 * Add a new blank state.
-	 * @param name  The name of the new state (default "New state").
+	 * @param name The name of the new state (default "New state").
 	 */
 	addState(name: string): this {
 		if (name === undefined) {
@@ -373,7 +373,7 @@ export default class NFA {
 
 	/**
 	 * Check whether the given state is generating (has a path to an accept state).
-	 * @param state  The state to check.
+	 * @param state The state to check.
 	 */
 	generating(state: State): boolean {
 		return this.generatingStates.has(this.state(state));
@@ -381,9 +381,9 @@ export default class NFA {
 
 	/**
 	 * Return whether there is a transition from one state to another.
-	 * @param origin  The origin state ID.
-	 * @param target  The origin state ID.
-	 * @param symbol  If provided, will only return true if the transition is on this symbol.
+	 * @param origin The origin state ID.
+	 * @param target The origin state ID.
+	 * @param symbol If provided, will only return true if the transition is on this symbol.
 	 */
 	hasTransition(origin: State, target: State, symbol?: string): boolean {
 		origin = this.state(origin);
@@ -468,7 +468,7 @@ export default class NFA {
 	 * Also empties the cache, thus fully preparing it for modification.
 	 * It will be mutable, so it can have elements replaced if need be
 	 * (but any previously immutable elements will remain so).
-	 * @param keepCache  Whether to copy/keep the cache from the old object.
+	 * @param keepCache Whether to copy/keep the cache from the old object.
 	 */
 	mutable(keepCache: boolean = false): this {
 		if (this._mutable) {
@@ -571,8 +571,8 @@ export default class NFA {
 
 	/**
 	 * Set whether a state is an accept state or not.
-	 * @param state  The state to set.
-	 * @param accept  Whether it should be an accept state.
+	 * @param state The state to set.
+	 * @param accept Whether it should be an accept state.
 	 */
 	setAccept(state: State, accept: boolean): this {
 		state = this.state(state);
@@ -663,9 +663,9 @@ export default class NFA {
 
 	/**
 	 * Set the symbols of a transition (creating the transition if it does not exist).
-	 * @param id  ID of the origin state.
-	 * @param target  ID of the target state.
-	 * @param symbols  The new symbol group.
+	 * @param id ID of the origin state.
+	 * @param target ID of the target state.
+	 * @param symbols The new symbol group.
 	 */
 	setTransition(origin: State, target: State, symbols: SymbolGroupInput): this {
 		origin = this.state(origin);
