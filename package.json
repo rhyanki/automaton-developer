@@ -5,8 +5,9 @@
 	"dependencies": {
 		"@types/jest": "^19.2.2",
 		"@types/node": "^7.0.12",
-		"@types/react": "^15.0.21",
+		"@types/react": "^16.0.40",
 		"@types/react-dom": "^0.14.23",
+		"immutable": "^3.8.2",
 		"react": "^15.5.3",
 		"react-dom": "^15.5.3"
 	},
