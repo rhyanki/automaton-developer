@@ -18,12 +18,12 @@ import SymbolGroup, {SymbolGroupInput} from './SymbolGroup';
  */
 
 export type State = number;
-export type Definition = {
-	n: number,
+export interface IDefinition {
 	accept?: number[],
 	alphabet?: string,
+	n: number,
 	names?: string[],
-	transitions?: [number, string][][],
+	transitions?: Array<Array<[number, string]>>,
 };
 export type TransitionGroup = Map<State, SymbolGroup>;
 export type TransitionMap = Map<State, TransitionGroup>;
@@ -50,14 +50,14 @@ export default class NFA {
 		willAccept?: boolean,
 	};
 	
-	constructor(definition: NFA | Definition, mutable?: boolean) {
+	constructor(definition: NFA | IDefinition, mutable?: boolean) {
 		this._init(definition, mutable);
 	}
 
-	protected _init(definition: NFA | Definition, mutable?: boolean): this {
+	protected _init(definition: NFA | IDefinition, mutable?: boolean): this {
 		// If this is a copy of an existing NFA ...
 		if (definition instanceof NFA) {
-			for (var k in definition) {
+			for (const k in definition) {
 				if (definition.hasOwnProperty(k)) {
 					this[k] = definition[k];
 				}
@@ -250,7 +250,7 @@ export default class NFA {
 	 * Whether the NFA is trimmed (has no unreachable or nongenerating states except the start state).
 	 */
 	get isTrimmed(): boolean {
-		let numUnreachable = this.numStates - this.reachableStates.size;
+		const numUnreachable = this.numStates - this.reachableStates.size;
 		if (numUnreachable !== 0) {
 			return false;
 		}
@@ -324,7 +324,7 @@ export default class NFA {
 
 		nfa._states = nfa._states.asMutable().add(id);
 		nfa._names = nfa._names.asMutable().set(id, name);
-		nfa._transitions = nfa._transitions.asMutable().set(id, <TransitionGroup> Map().asMutable());
+		nfa._transitions = nfa._transitions.asMutable().set(id, Map<number, SymbolGroup>().asMutable());
 
 		if (!this._mutable) {
 			nfa.immutable();
@@ -555,7 +555,7 @@ export default class NFA {
 
 		const cache = this._cache;
 		const nfa = this.mutable();
-		const transitions = (<TransitionGroup> nfa._transitions.get(origin)).asMutable();
+		const transitions = nfa._transitions.get(origin)!.asMutable();
 		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.delete(target));
 
 		// If the NFA was a DFA, it definitely still is.
@@ -694,7 +694,7 @@ export default class NFA {
 		}
 
 		// hasTransition() above guarantees that this is not undefined
-		const transitions = (<TransitionGroup> nfa._transitions.get(origin)).asMutable();
+		const transitions = (nfa._transitions.get(origin))!.asMutable();
 
 		// Update the transition
 		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.set(target, symbols));
@@ -781,10 +781,10 @@ export default class NFA {
 	/**
 	 * Get a definition of the NFA, easily convertable to JSON and parseable by the constructor.
 	 */
-	toDefinition(): Definition {
+	toDefinition(): IDefinition {
 		// Create a normalized ID map, mapping each state to an ID from 0 to numStates-1, where 0 is the start state.
 		const toState = [this._start];
-		let fromState = Map<State, number>([[this._start, 0]]).asMutable();
+		const fromState = Map<State, number>([[this._start, 0]]).asMutable();
 
 		for (const state of this._states) {
 			if (state === this._start) {
@@ -806,22 +806,22 @@ export default class NFA {
 			}
 		}
 
-		const transitions = [] as [number, string][][];
+		const transitions = [] as Array<Array<[number, string]>>;
 		for (const origin of toState) {
-			const transitionsFrom = [] as [number, string][];
+			const transitionsFrom = [] as Array<[number, string]>;
 			for (const [target, symbols] of this.transitionsFrom(origin)) {
-				transitionsFrom.push([fromState.get(target) as number, symbols.toString()]);
+				transitionsFrom.push([fromState.get(target)!, symbols.toString()]);
 			}
 			transitionsFrom.sort((a, b) => a[0] - b[0]);
 			transitions.push(transitionsFrom);
 		}
-		
+
 		const ret = {
+			accept,
 			n: this.numStates,
-			accept: accept,
-			names: names,
-			transitions: transitions,
-		} as Definition;
+			names,
+			transitions,
+		} as IDefinition;
 		if (this.hasSetAlphabet) {
 			ret.alphabet = this.alphabet.toString(" ", false);
 		}
@@ -840,7 +840,7 @@ export default class NFA {
 	 */
 	transitionsFrom(origin: State): TransitionGroup {
 		origin = this.state(origin);
-		return this._transitions.get(origin) || <TransitionGroup> Map();
+		return this._transitions.get(origin) || Map();
 	}
 
 	/**

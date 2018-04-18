@@ -1,21 +1,18 @@
-import {Definition} from '../Core/NFA';
+import {IDefinition} from '../Core/NFA';
 
-export type Preset = {
+export interface IPreset {
+	definition: IDefinition,
 	description: string,
 	examples: string[],
 	regex: string,
-	definition: Definition,
 };
 
-const presets: Preset[] = [
+const presets: IPreset[] = [
 	{
-		description: "Accepts strings that are an alternating sequence of b and a.",
-		examples: ["aba", "baba", "abababa"],
-		regex: "a?(ba)*b?",
 		definition: {
 			accept: [1, 2],
-			names: ["Start", "a", "b"],
 			n: 3,
+			names: ["Start", "a", "b"],
 			transitions: [
 				[
 					[1, "a"],
@@ -29,15 +26,15 @@ const presets: Preset[] = [
 				],
 			],
 		},
+		description: "Accepts strings that are an alternating sequence of b and a.",
+		examples: ["aba", "baba", "abababa"],
+		regex: "a?(ba)*b?",
 	},
 	{
-		description: "Accepts strings that start with ab and end with ba.",
-		examples: ["aba", "abba", "abababa"],
-		regex: "a?(ba)*b?",
 		definition: {
 			accept: [3],
-			names: ["Start", "First a", "Any b", "a after b", "Anything else", "Unreachable"],
 			n: 5,
+			names: ["Start", "First a", "Any b", "a after b", "Anything else", "Unreachable"],
 			transitions: [
 				[
 					[1, "a"],
@@ -59,6 +56,9 @@ const presets: Preset[] = [
 				],
 			],
 		},
+		description: "Accepts strings that start with ab and end with ba.",
+		examples: ["aba", "abba", "abababa"],
+		regex: "a?(ba)*b?",
 	},
 ];
 

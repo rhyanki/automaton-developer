@@ -1,13 +1,16 @@
-import * as React from 'react';
 import {List, OrderedMap} from 'immutable';
+import * as React from 'react';
 
 import RunnableNFA, {State} from '../Core/RunnableNFA';
 import SymbolGroup, {allowedRanges} from '../Core/SymbolGroup';
-// import ListEditor from './ListEditor/ListEditor';
-import VisualEditor from './VisualEditor/VisualEditor';
-import TestInputEditor from './TestInputEditor/TestInputEditor';
+
 import ControlPanel from './ControlPanel/ControlPanel';
+// import ListEditor from './ListEditor/ListEditor';
+import TestInputEditor from './TestInputEditor/TestInputEditor';
+import VisualEditor from './VisualEditor/VisualEditor';
+
 import presets from './presets';
+
 import './NFAEditor.css';
 
 /*const _editors = OrderedMap([
@@ -21,12 +24,11 @@ const _tabs = OrderedMap([
 	['presets', "Presets"],
 	['transform', "Transform"],
 	['port', "Import/Export"],
-] as [Tab, string][]);
+] as Array<[Tab, string]>);
 
 const EDIT_SYMBOLS_DELIMITER = " ";
 
-type CProps = null;
-type CState = {
+interface IState {
 	nfa: RunnableNFA,
 	editor: EditorType,
 	importing: string,
@@ -36,26 +38,26 @@ type CState = {
 type EditorType = 'visual' | 'list';
 type Tab = 'test' | 'presets' | 'instructions' | 'transform' | 'port';
 
-export default class NFAEditor extends React.PureComponent<CProps, CState> {
+export default class NFAEditor extends React.PureComponent<{}, IState> {
 	private history: RunnableNFA[];
 
-	constructor() {
-		super();
+	constructor(props: {}) {
+		super(props);
 
 		this.history = [];
 
 		this.state = {
-			nfa: new RunnableNFA((presets as any)[0].definition),
 			editor: 'visual',
 			importing: "",
+			nfa: new RunnableNFA((presets as any)[0].definition),
 			tab: 'instructions',
 			testInputs: List([""]),
 		};
 
-		// (window as any).nfa = this.state.nfa; // For debugging
+		(window as any).nfa = this.state.nfa; // For debugging
 	}
 
-	componentDidUpdate(prevProps: CProps, prevState: CState) {
+	componentDidUpdate(prevProps: {}, prevState: IState) {
 		// (window as any).nfa = this.state.nfa; // For debugging
 	}
 
@@ -76,7 +78,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 					</select>
 					<br/>*/}
 					<ul className="nav nav-pills">
-						{_tabs.map((name, key) => (
+						{[..._tabs.map((name, key) => (
 							<li
 								key={key}
 								role="presentation"
@@ -85,7 +87,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 							>
 								<a href="#">{name}</a>
 							</li>
-						))}
+						)).values()]}
 					</ul>
 					<br/>
 					<div style={this.displayIf(this.state.tab === 'test')}>
@@ -254,14 +256,14 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 		if (!window.confirm("Are you sure you want to delete this state?")) {
 			return;
 		}
-		this.onNFA('removeState', ...arguments);
+		this.onNFA('removeState', state);
 	}
 
 	confirmRemoveTransition = (origin: State, target: State) => {
 		if (!window.confirm("Are you sure you want to delete this transition?")) {
 			return;
 		}
-		this.onNFA('removeTransition', ...arguments);
+		this.onNFA('removeTransition', origin, target);
 	}
 
 	/**
@@ -302,7 +304,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 				};
 			} catch (e) {
 				window.alert("Invalid input.");
-				return;
+				return null;
 			}
 		});
 	}
@@ -334,7 +336,7 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 				};
 			} catch (e) {
 				window.alert(e.message);
-				return;
+				return null;
 			}
 		});
 	}
@@ -377,15 +379,15 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	setInput = (input: string) => {
-		this.onNFA('setInput', ...arguments);
+		this.onNFA('setInput', input);
 	}
 
 	setName = (state: State, name: string) => {
-		this.onNFA('setName', ...arguments);
+		this.onNFA('setName', state, name);
 	}
 
 	setStart = (state: State) => {
-		this.onNFA('setStart', ...arguments);
+		this.onNFA('setStart', state);
 	}
 
 	step = () => {
@@ -397,15 +399,15 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	switchEditor = (editor: EditorType) => {
-		this.setState({editor: editor});
+		this.setState({editor});
 	}
 
 	switchTab = (tab: Tab) => {
-		this.setState({tab: tab});
+		this.setState({tab});
 	}
 
 	toggleAccept = (state: State) => {
-		this.onNFA('toggleAccept', ...arguments);
+		this.onNFA('toggleAccept', state);
 	}
 
 	trim = () => {
@@ -427,6 +429,6 @@ export default class NFAEditor extends React.PureComponent<CProps, CState> {
 				return;
 			}
 		}
-		this.onNFA('setTransitionTarget', ...arguments);
+		this.onNFA('setTransitionTarget', origin, oldTarget, newTarget);
 	}
 }

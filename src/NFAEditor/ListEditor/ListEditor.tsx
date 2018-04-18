@@ -1,10 +1,10 @@
+import {List} from 'immutable';
 import * as React from 'react';
 import NFA, {State} from '../../Core/NFA';
-import {List} from 'immutable';
-import TransitionList from './TransitionList';
 import './ListEditor.css';
+import TransitionList from './TransitionList';
 
-type CProps = {
+interface IProps {
 	nfa: NFA,
 	promptUpdateTransitionSymbols: (state: State, target: State) => any,
 	setStart: (state: State) => any,
@@ -12,12 +12,12 @@ type CProps = {
 	toggleAccept: (state: State) => any,
 	updateTransitionTarget: (origin: State, oldTarget: State, newTarget: State) => any,
 };
-type CState = {
+interface IState {
 	order: List<State>,
 };
 
-class ListEditor extends React.PureComponent<CProps, CState> {
-	constructor(props: CProps) {
+class ListEditor extends React.PureComponent<IProps, IState> {
+	constructor(props: IProps) {
 		super(props);
 
 		this.handleMoveStateDown = this.handleMoveStateDown.bind(this);
@@ -29,7 +29,7 @@ class ListEditor extends React.PureComponent<CProps, CState> {
 		Object.freeze(this.state.order);
 	}
 
-	componentWillReceiveProps(nextProps: CProps) {
+	componentWillReceiveProps(nextProps: IProps) {
 		if (this.props.nfa.states === nextProps.nfa.states) {
 			return;
 		}
@@ -56,10 +56,10 @@ class ListEditor extends React.PureComponent<CProps, CState> {
 	}
 
 	moveState(state: State, inc: number) {
-		this.setState((prevState: CState, prevProps: CProps) => {
+		this.setState((prevState, prevProps) => {
 			// Perform the swap
-			let pos1 = prevState.order.indexOf(state);
-			let pos2 = pos1 + inc;
+			const pos1 = prevState.order.indexOf(state);
+			const pos2 = pos1 + inc;
 			if (pos1 === -1 || pos2 < 0 || pos2 >= prevState.order.size) {
 				return;
 			}

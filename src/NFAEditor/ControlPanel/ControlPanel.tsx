@@ -2,7 +2,7 @@ import * as React from 'react';
 import RunnableNFA from '../../Core/RunnableNFA';
 import './ControlPanel.css';
 
-type CProps = {
+interface IProps {
 	nfa: RunnableNFA,
 	addState: () => any,
 	back: () => any,
@@ -15,8 +15,8 @@ type CProps = {
 	step: () => any,
 };
 
-export default class ControlPanel extends React.PureComponent<CProps, null> {
-	constructor(props: CProps) {
+export default class ControlPanel extends React.PureComponent<IProps> {
+	constructor(props: IProps) {
 		super(props);
 	}
 

@@ -29,6 +29,6 @@ Currently it supports only finite-state automata (both deterministic and nondete
 
 This project is written in TypeScript and uses React for its UI.
 
-It was bootstrapped with [Create React App (Typescript)](https://github.com/wmonk/create-react-app-typescript).
+It was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 See [here](https://github.com/facebookincubator/create-react-app/blob/master/packages/react-scripts/template/README.md) for a comprehensive guide on using, building and modifying Create React App projects.

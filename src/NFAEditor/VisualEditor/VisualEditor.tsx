@@ -1,13 +1,17 @@
-import * as React from 'react';
-import NFA, {State} from '../../Core/RunnableNFA';
 import {Map} from 'immutable';
+import * as React from 'react';
+
 import {Vector, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
 import {shareAny} from '../../Util/sets';
-import VisualState from './VisualState/VisualState';
+
+import NFA, {State} from '../../Core/RunnableNFA';
+
 import LabelledArrow from './LabelledArrow';
+import VisualState from './VisualState/VisualState';
+
 import './VisualEditor.css';
 
-type CProps = {
+interface IProps {
 	nfa: NFA,
 	confirmRemoveState: (state: State) => any,
 	confirmRemoveTransition: (origin: State, target: State) => any,
@@ -17,7 +21,7 @@ type CProps = {
 	setStart: (state: State) => any,
 	toggleAccept: (state: State) => any,
 };
-type CState = {
+interface IState {
 	positions: Map<State, Vector>,
 	cursorPos: Vector,
 	draggingState: State,
@@ -26,35 +30,37 @@ type CState = {
 	drawingTransitionSymbols?: string,
 };
 
-class VisualEditor extends React.PureComponent<CProps, CState> {
+class VisualEditor extends React.PureComponent<IProps, IState> {
 	width: number = 820;
 	height: number = 650;
 	DEFAULT_POS: Vector;
 	STATE_RADIUS: number = 50;
 	NAME_SIZE: number = 14;
-	svg: SVGSVGElement;
+	svg: React.RefObject<SVGSVGElement>;
 
-	constructor(props: CProps) {
+	constructor(props: IProps) {
 		super(props);
 
 		this.DEFAULT_POS = new Vector(this.width / 2, this.height / 2);
 
 		this.state = {
-			positions: Map() as Map<State, Vector>,
 			cursorPos: new Vector(-1, -1),
 			draggingState: 0,
 			drawingTransitionOrigin: 0,
-			drawingTransitionTarget: 0,
 			drawingTransitionSymbols: "",
+			drawingTransitionTarget: 0,
+			positions: Map() as Map<State, Vector>,
 		};
 		Object.freeze(this.state);
+
+		this.svg = React.createRef();
 	}
 
 	componentDidMount() {
 		this.resetPositions();
 	}
 
-	componentWillReceiveProps(nextProps: CProps) {
+	componentWillReceiveProps(nextProps: IProps) {
 		if (this.props.nfa.states === nextProps.nfa.states) {
 			return;
 		}
@@ -80,7 +86,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		return (
 			<div className="VisualEditor">
 				<svg
-					ref={(svg) => this.svg = svg}
+					ref={this.svg}
 					width="100%"
 					height="100%"
 					onMouseMove={(e) => this.onMouseMove(e)}
@@ -103,7 +109,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 								promptEditName={() => this.props.promptEditState(state)}
 								remove={() => this.props.confirmRemoveState(state)}
 								setStart={() => this.props.setStart(state)}
-								toggleAccept={() => this.props.toggleAccept(state)}
+								toggleAccept={() => {console.log(state); this.props.toggleAccept(state)}}
 							/>
 						</g>
 					))}
@@ -118,7 +124,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	 */
 	dragStateStart(state: State, cursorPos: Vector) {
 		this.setState({
-			cursorPos: cursorPos,
+			cursorPos,
 			draggingState: state,
 		});
 	}
@@ -136,12 +142,12 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 			const diff = cursorPos.minus(prevState.cursorPos as Vector);
 			const oldPos = prevState.positions.get(prevState.draggingState);
 			if (!oldPos) {
-				return;
+				return null;
 			}
 			const newPos = oldPos.plus(diff);
 			return {
+				cursorPos,
 				positions: prevState.positions.set(prevState.draggingState, newPos),
-				cursorPos: cursorPos,
 			};
 		});
 	}
@@ -181,7 +187,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		if (!this.isDrawingTransition()) {
 			return;
 		}
-		this.setState({cursorPos: cursorPos});
+		this.setState({cursorPos});
 	}
 
 	/**
@@ -191,7 +197,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	 */
 	drawTransitionStart(origin: State, cursorPos: Vector) {
 		this.setState({
-			cursorPos: cursorPos,
+			cursorPos,
 			drawingTransitionOrigin: origin,
 			drawingTransitionTarget: 0,
 		});
@@ -216,10 +222,10 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 			y = x.y;
 			x = x.x;
 		}
-		let point = this.svg.createSVGPoint();
+		let point = this.svg.current!.createSVGPoint();
 		point.x = x;
 		point.y = y as number;
-		point = point.matrixTransform(this.svg.getScreenCTM().inverse());
+		point = point.matrixTransform(this.svg.current!.getScreenCTM()!.inverse());
 		return new Vector(point.x, point.y);
 	}
 
@@ -301,11 +307,11 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 	 * Set the positions of the states so that they are arranged in a circle around the center of the editor.
 	 */
 	resetPositions(nfa?: NFA) {
-		this.setState((prevState: CState, prevProps: CProps) => {
+		this.setState((prevState, prevProps) => {
 			if (!nfa) {
 				nfa = prevProps.nfa;
 			}
-			const positions = Map().asMutable(); // Stores the positions of each state
+			const positions = Map<State, Vector>().asMutable(); // Stores the positions of each state
 			const numStates = nfa.numStates;
 
 			let angle = Math.PI; // The angle at which the next state should be placed
@@ -440,7 +446,7 @@ class VisualEditor extends React.PureComponent<CProps, CState> {
 		for (const state of nfa.states) {
 			if (nfa.hasTransition(state, state)) {
 				const pos = this.pos(state);
-				let angs = angles.get(state) as number[];
+				const angs = angles.get(state) as number[];
 
 				let angle;
 

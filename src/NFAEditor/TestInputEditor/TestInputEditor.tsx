@@ -1,18 +1,20 @@
-import * as React from 'react';
-import RunnableNFA from '../../Core/RunnableNFA';
 import {List} from 'immutable';
+import * as React from 'react';
+
+import RunnableNFA from '../../Core/RunnableNFA';
+
 import './TestInputEditor.css';
 
-type CProps = {
+interface IProps {
 	nfa: RunnableNFA,
 	runOnInput: (input: string) => any,
 };
-type CState = {
+interface IState {
 	inputs: List<string>,
 };
 
-export default class TestInputEditor extends React.PureComponent<CProps, CState> {
-	constructor(props: CProps) {
+export default class TestInputEditor extends React.PureComponent<IProps, IState> {
+	constructor(props: IProps) {
 		super(props);
 
 		this.state = {

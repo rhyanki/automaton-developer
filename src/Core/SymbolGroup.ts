@@ -1,6 +1,6 @@
 import {Map, OrderedSet, Set} from 'immutable';
 
-type Symbol = string;
+type Smbl = string;
 
 class CharRange {
 	_start: number; // Codepoint of first character in range
@@ -10,7 +10,7 @@ class CharRange {
 	 * @param range The range as a single character, or string of the form "a-z".
 	 * @param end The last character in the range. If provided, the range param is taken to be the first character.
 	 */
-	constructor(range: string | Symbol | CharRange, end?: string) {
+	constructor(range: string | Smbl | CharRange, end?: string) {
 		if (range instanceof CharRange) {
 			return range;
 		}
@@ -37,7 +37,7 @@ class CharRange {
 	/**
 	 * Whether the range contains a symbol or another range within it.
 	 */
-	contains(range: Symbol | CharRange | string): boolean {
+	contains(range: Smbl | CharRange | string): boolean {
 		const r = new CharRange(range);
 		return this._start <= r._start && r._end <= this._end;
 	}
@@ -49,7 +49,7 @@ class CharRange {
 	/**
 	 * Iterate over all the characters in the range.
 	 */
-	*[Symbol.iterator](): IterableIterator<Symbol> {
+	*[Symbol.iterator](): IterableIterator<Smbl> {
 		let current = this._start;
 		while (current <= this._end) {
 			yield String.fromCharCode(current);
@@ -59,7 +59,7 @@ class CharRange {
 }
 
 // The symbols which MUST be specially represented in the symbol group's input and output.
-const _fromSpecial = Map<string, Symbol>([
+const _fromSpecial = Map<string, Smbl>([
 	["ε", ""],
 	["~", ""],
 	["␣", " "],
@@ -83,7 +83,7 @@ export {allowedRanges};
 
 // All parameters which ask for a symbol group should also be able to accept an input string
 // which can be converted to one.
-export type SymbolGroupInput = SymbolGroup | string | Set<Symbol> | undefined;
+export type SymbolGroupInput = SymbolGroup | string | Set<Smbl> | undefined;
 
 /**
  * Immutable class for storing a symbol group, which is used in transitions.
@@ -92,7 +92,7 @@ export type SymbolGroupInput = SymbolGroup | string | Set<Symbol> | undefined;
  *     a-z, A-Z, 0-9: character ranges (smaller ones allowed too)
  */
 export default class SymbolGroup {
-	_symbols: OrderedSet<Symbol>; // Ordered set of all symbols (as strings) in the group, sorted by Unicode code point
+	_symbols: OrderedSet<Smbl>; // Ordered set of all symbols (as strings) in the group, sorted by Unicode code point
 	_normalized: string;
 
 	/**
@@ -165,7 +165,7 @@ export default class SymbolGroup {
 			// Unicode normalize the string, combining as many characters as possible
 			input = input.normalize();
 
-			symbols = Set<Symbol>().asMutable();
+			symbols = Set<Smbl>().asMutable();
 
 			// Compile a regex for the delimiter
 			const delimiterRegex = new RegExp("^" + delimiter);
@@ -223,7 +223,7 @@ export default class SymbolGroup {
 			symbols = input;
 		}
 
-		this._symbols = symbols.sort() as OrderedSet<Symbol>;
+		this._symbols = symbols.sort() as OrderedSet<Smbl>;
 		this._normalized = this.toString(" ");
 	}
 
@@ -253,7 +253,7 @@ export default class SymbolGroup {
 	/**
 	 * Whether this symbol group contains a symbol.
 	 */
-	has(symbol: Symbol) {
+	has(symbol: Smbl) {
 		return this._symbols.has(symbol);
 	}
 
@@ -291,7 +291,7 @@ export default class SymbolGroup {
 	 * @param includeEmpty Whether to include ε in the output.
 	 */
 	toString(delimiter: string = " ", includeEmpty: boolean = false): string {
-		const outputForm = (symbol: Symbol): string => {
+		const outputForm = (symbol: Smbl): string => {
 			const special = _toSpecial.get(symbol);
 			if (special) {
 				// Convert it to a special symbol if possible
@@ -363,7 +363,7 @@ export default class SymbolGroup {
 	/**
 	 * Iterate over all the symbols in the group.
 	 */
-	*[Symbol.iterator](): IterableIterator<Symbol> {
+	*[Symbol.iterator](): IterableIterator<Smbl> {
 		yield *this._symbols;
 	}
 }

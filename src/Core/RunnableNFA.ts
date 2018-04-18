@@ -1,8 +1,8 @@
-import NFA, {Definition, State, SymbolGroup, TransitionGroup, TransitionMap} from './NFA';
 import {Map, Set} from 'immutable';
 import {shareAny} from '../Util/sets';
+import NFA, {IDefinition, State, SymbolGroup, TransitionGroup, TransitionMap} from './NFA';
 
-export type Definition = Definition;
+export type IDefinition = IDefinition;
 export type Result = -1 | 0 | 1;
 export type State = State;
 export type TransitionGroup = TransitionGroup;
@@ -26,7 +26,7 @@ export default class RunnableNFA extends NFA {
 	// The value is the step on which it was last followed.
 	protected _followedTransitions: Map<string, number>;
 
-	protected _init(definition: NFA | Definition, mutable?: boolean): this {
+	protected _init(definition: NFA | IDefinition, mutable?: boolean): this {
 		this._current = Set().asMutable();
 		this._remainingInput = "";
 		this._numRead = -1;

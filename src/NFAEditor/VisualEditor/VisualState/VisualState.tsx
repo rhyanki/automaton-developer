@@ -2,7 +2,7 @@ import * as React from 'react';
 import RunnableNFA, {State} from '../../../Core/RunnableNFA';
 import './VisualState.css';
 
-type CProps = {
+interface IProps {
 	nfa: RunnableNFA,
 	state: State,
 	radius: number,
@@ -15,7 +15,7 @@ type CProps = {
 	toggleAccept: () => any,
 };
 
-export default class VisualState extends React.PureComponent<CProps, null> {
+export default class VisualState extends React.PureComponent<IProps> {
 	render() {
 		const nfa = this.props.nfa;
 		const state = this.props.state;

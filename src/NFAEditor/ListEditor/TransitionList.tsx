@@ -2,21 +2,21 @@ import * as React from 'react';
 import NFA, {State} from '../../Core/NFA';
 import './TransitionList.css';
 
-type CProps = {
+interface IProps {
 	nfa: NFA,
 	state: State,
 	promptUpdateTransitionSymbols: (state: State, target: State) => any,
 	updateTransitionTarget: (origin: State, oldTarget: State, newTarget: State) => any,
 };
 
-class TransitionList extends React.PureComponent<CProps, null> {
+class TransitionList extends React.PureComponent<IProps> {
 	render() {
-		let rows = [];
+		const rows = [];
 		const nfa = this.props.nfa;
 		const state = this.props.state;
 		const sortedTransitions = [...nfa.transitionsFrom(state)].sort((a, b) => a[0] - b[0]);
 		for (const [target, symbols] of sortedTransitions) {
-			let opts = [];
+			const opts = [];
 			for (const opt of nfa.states) {
 				opts.push(
 					<option key={opt} value={opt}>{nfa.name(opt)}</option>

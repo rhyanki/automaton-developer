@@ -2,32 +2,32 @@ import * as React from 'react';
 import {Vector, normalizeAngle, perpendicularOffset, quadraticCurveAt} from '../../Util/math';
 import {defaults} from '../../Util/general';
 
-type CProps = {
-	/** The start position. */
-	start: Vector,
-	/** The end position. */
-	end: Vector,
-	/** The control point (defaults to the midpoint of start and end - i.e., a straight line). */
-	control?: Vector,
-	/** If provided, the arrow will be an arc from start to end with the given radius. */
-	radius?: number,
+interface IProps {
 	/** The t value (t from 0 to 1) at which to draw the arrowhead. */
 	arrowHeadT?: number,
-	/** The label text. */
-	label?: string,
-	/** Handler for when the shaft is clicked. */
-	onClickShaft?: React.EventHandler<React.MouseEvent<any>>,
-	/** Handler for when the label is clicked. */
-	onClickLabel?: React.EventHandler<React.MouseEvent<any>>,
 	/** The classname for the main <g>. */
 	className?: string,
+	/** The control point (defaults to the midpoint of start and end - i.e., a straight line). */
+	control?: Vector,
+	/** The end position. */
+	end: Vector,
+	/** The label text. */
+	label?: string,
+	/** Handler for when the label is clicked. */
+	onClickLabel?: React.EventHandler<React.MouseEvent<any>>,
+	/** Handler for when the shaft is clicked. */
+	onClickShaft?: React.EventHandler<React.MouseEvent<any>>,
+	/** If provided, the arrow will be an arc from start to end with the given radius. */
+	radius?: number,
+	/** The start position. */
+	start: Vector,
 };
 
 /**
  * Renders a labelled, directed, clickable, arrow between two points, with the label rendered in the centre.
  * The arrow may be a straight line, a quadratic curve (if control provided), or an arc (if radius provided).
  */
-class LabelledArrow extends React.PureComponent<CProps, null> {
+class LabelledArrow extends React.PureComponent<IProps> {
 	/**
 	 * Return a polyline consisting of two short lines in the shape of an arrowhead.
 	 * @param pos The position of the tip of the arrow.
@@ -51,10 +51,10 @@ class LabelledArrow extends React.PureComponent<CProps, null> {
 		const end = this.props.end;
 
 		const def = {
-			control: Vector.midpoint(start, end),
 			arrowHeadT: 1,
-			label: "",
 			className: "LabelledArrow",
+			control: Vector.midpoint(start, end),
+			label: "",
 		};
 		const props = defaults(this.props, def, false);
 
