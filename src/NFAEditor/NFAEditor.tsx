@@ -223,6 +223,11 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 							toggleAccept={this.toggleAccept}
 						/>
 					</div>
+					<div>
+						<span className="state unreachable">Unreachable</span>,&nbsp;
+						<span className="state nongenerating">Non-generating</span>,&nbsp;
+						<span className="state accept">Accept</span>
+					</div>
 				</div>
 			</div>
 		));
