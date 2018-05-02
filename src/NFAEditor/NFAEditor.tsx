@@ -136,7 +136,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						</table>
 					</div>
 					<div style={this.displayIf(this.state.tab === 'transform')}>
-						<button className="btn btn-default" disabled={nfa.isDFA} title={nfa.isDFA ? "Your NFA is already a DFA." : ""}>
+						<button className="btn btn-default" disabled={true} title={nfa.isDFA ? "Your NFA is already a DFA." : "Functionality coming soon."}>
 							Convert to DFA
 						</button>
 						<br/>
@@ -144,7 +144,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						<button
 							className="btn btn-default"
 							disabled={nfa.isTrimmed}
-							title="Remove nongenerating and unreachable states."
+							title={nfa.isTrimmed ? "There are no nongenerating or unreachable states to trim." : "Remove nongenerating and unreachable states."}
 							onClick={() => this.trim()}
 						>
 							Trim
@@ -153,7 +153,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						<br/>
 						<button
 							className="btn btn-default"
-							title="Make all states transition on all symbols."
+							title={"Make all states transition on all symbols."}
 							onClick={() => this.complete()}
 						>
 							Complete

@@ -89,6 +89,7 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 					ref={this.svg}
 					width="100%"
 					height="100%"
+					onContextMenu={(e) => e.preventDefault()}
 					onMouseMove={(e) => this.onMouseMove(e)}
 					onMouseLeave={() => this.onMouseLeave()}
 					onMouseUp={(e) => this.onMouseUp(e)}
