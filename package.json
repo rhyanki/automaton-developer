@@ -1,6 +1,7 @@
 {
   "name": "crats",
-  "version": "0.1.0",
+  "homepage": "https://rhyanki.com/automaton-developer/",
+  "version": "0.2.0",
   "private": true,
   "dependencies": {
     "immutable": "^4.0.0-rc.9",
