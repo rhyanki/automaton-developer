@@ -111,7 +111,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						</p>
 						<label>Editing transitions in the visual editor</label>
 						<p>
-							To create a new transition, right-click on a state and drag the mouse to another state.
+							To create a new transition, hover over a state, click and hold the pencil button, and drag the mouse to another state.
 						</p>
 						<p>
 							To delete a transition, just click on its arrow shaft.

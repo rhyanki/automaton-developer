@@ -21,7 +21,25 @@
 	display: inline;
 }
 
+.VisualState:hover .start-flag {
+	display: none;
+}
+
 .VisualState .btn-edit:hover {
 	background-color: aquamarine;
 	cursor: pointer;
+}
+
+.VisualState i.btn-edit {
+	width: 30px;
+}
+
+.VisualState .state-name {
+	font-family: 'Verdana';
+	font-weight: bold;
+}
+
+.VisualState .state-name:hover {
+	cursor: text;
+	fill: grey;
 }

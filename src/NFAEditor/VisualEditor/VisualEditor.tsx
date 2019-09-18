@@ -104,6 +104,7 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 								nfa={nfa}
 								state={state}
 								radius={this.STATE_RADIUS}
+								onBeginDrawTransition={(e) => this.onBeginDrawTransition(e, state)}
 								onMouseDown={(e) => this.onMouseDownState(e, state)}
 								onMouseEnter={(e) => this.onMouseEnterState(e, state)}
 								onMouseLeave={() => this.onMouseLeaveState()}
@@ -261,12 +262,20 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 		if (!cursorPos) {
 			return
 		}
-		// If left-click, this is a state drag; if right-click, it's a transition drag
-		if (e.button === 0) {
-			this.dragStateStart(state, cursorPos);
-		} else if (e.button === 2) {
-			this.drawTransitionStart(state, cursorPos);
+		this.dragStateStart(state, cursorPos);
+	}
+
+	/**
+	 * Start drawing (or moving) a transition.
+	 * @param origin  The origin state.
+	 * @param cursorPos  The initial cursor position.
+	 */
+	onBeginDrawTransition(e: React.MouseEvent<any>, origin: State) {
+		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
+		if (!cursorPos) {
+			return
 		}
+		this.drawTransitionStart(origin, cursorPos)
 	}
 
 	/**
@@ -309,10 +318,6 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 	 * Event handler for when the mouse is released on the editor.
 	 */
 	onMouseUp(e: React.MouseEvent<any>) {
-		if (e.button === 2) {
-			// Stop the context menu from appearing, if a right-click
-			e.preventDefault();
-		}
 		this.dragStateStop();
 		this.drawTransitionComplete();
 	}
