@@ -21,8 +21,8 @@ export default class ControlPanel extends React.PureComponent<IProps> {
 		return (
 			<div className="ControlPanel">
 				<form className="form-inline">
-					<button className="btn btn-default" onClick={() => this.props.addState()}>Add State</button>
-					<button className="btn btn-default" onClick={() => this.props.clear()}>Clear All</button>
+					<button type="button" className="btn btn-default" onClick={() => this.props.addState()}>Add State</button>
+					<button type="button" className="btn btn-default" onClick={() => this.props.clear()}>Clear All</button>
 					<input
 						type="text"
 						className="form-control"
@@ -30,6 +30,7 @@ export default class ControlPanel extends React.PureComponent<IProps> {
 						onChange={(e) => this.props.setInput(e.target.value)}
 					/>
 					<button
+						type="button"
 						className="btn btn-default"
 						onClick={() => this.props.step()}
 						disabled={!nfa.remainingInput}
@@ -37,14 +38,16 @@ export default class ControlPanel extends React.PureComponent<IProps> {
 						Step
 					</button>
 					<button
+						type="button"
 						className="btn btn-default"
 						onClick={() => this.props.run()}
 						disabled={!nfa.remainingInput}
 					>
 						Run
 					</button>
-					<button className="btn btn-default" onClick={() => this.props.back()}>Undo</button>
+					<button type="button" className="btn btn-default" onClick={() => this.props.back()}>Undo</button>
 					<button
+						type="button"
 						className="btn btn-default"
 						onClick={() => this.props.stop()}
 						disabled={!nfa.isRunning}

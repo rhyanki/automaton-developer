@@ -128,7 +128,13 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 										<p>Regex: {preset.regex}</p>
 									</td>
 									<td>
-										<button className="btn btn-default" onClick={() => this.loadPreset(index)}>Load</button>
+										<button
+											type="button"
+											className="btn btn-default"
+											onClick={() => this.loadPreset(index)}
+										>
+											Load
+										</button>
 									</td>
 								</tr>
 							))}
@@ -136,12 +142,18 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						</table>
 					</div>
 					<div style={this.displayIf(this.state.tab === 'transform')}>
-						<button className="btn btn-default" disabled={true} title={nfa.isDFA ? "Your NFA is already a DFA." : "Functionality coming soon."}>
+						<button
+							type="button"
+							className="btn btn-default"
+							disabled={true}
+							title={nfa.isDFA ? "Your NFA is already a DFA." : "Functionality coming soon."}
+						>
 							Convert to DFA
 						</button>
 						<br/>
 						<br/>
 						<button
+							type="button"
 							className="btn btn-default"
 							disabled={nfa.isTrimmed}
 							title={nfa.isTrimmed ? "There are no nongenerating or unreachable states to trim." : "Remove nongenerating and unreachable states."}
@@ -152,6 +164,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						<br/>
 						<br/>
 						<button
+							type="button"
 							className="btn btn-default"
 							title={"Make all states transition on all symbols."}
 							onClick={() => this.complete()}
@@ -162,6 +175,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 					<div style={this.displayIf(this.state.tab === 'port')}>
 						<form className="form-inline">
 							<button
+								type="button"
 								className="btn btn-default"
 								onClick={() => this.setImporting("")}
 								disabled={!this.state.importing}
@@ -179,7 +193,12 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 							/>
 							<br/>
 							<br/>
-							<button className="btn btn-default" disabled={!this.state.importing} onClick={() => this.import()}>
+							<button
+								type="button"
+								className="btn btn-default"
+								disabled={!this.state.importing}
+								onClick={() => this.import()}
+							>
 								Import
 							</button>
 						</form>
