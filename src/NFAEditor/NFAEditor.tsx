@@ -49,7 +49,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 		this.state = {
 			editor: 'visual',
 			importing: "",
-			nfa: new RunnableNFA((presets as any)[0].definition),
+			nfa: new RunnableNFA().init((presets as any)[0].definition),
 			tab: 'instructions',
 			testInputs: List([""]),
 		};
@@ -190,7 +190,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 						<ControlPanel
 							nfa={nfa}
 							addState={this.addState}
-							back={this.back}
+							back={this.undo}
 							clear={this.clear}
 							editAlphabet={this.editAlphabet}
 							reset={this.reset}
@@ -237,16 +237,12 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 		this.onNFA('addState', name);
 	}
 
-	back = () => {
-		this.undo();
-	}
-
 	/**
 	 * Clear the editor, replacing the NFA with a blank one.
 	 */
 	clear = () => {
 		this.setState({
-			nfa: new RunnableNFA({
+			nfa: new RunnableNFA().init({
 				n: 1,
 				names: ["Start"],
 			})
@@ -305,7 +301,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 			try {
 				return {
 					importing: "",
-					nfa: new RunnableNFA(JSON.parse(prevState.importing).nfa),
+					nfa: new RunnableNFA().init(JSON.parse(prevState.importing).nfa),
 				};
 			} catch (e) {
 				window.alert("Invalid input.");
@@ -316,7 +312,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 
 	loadPreset = (index: number) => {
 		this.setState({
-			nfa: new RunnableNFA(presets[index].definition),
+			nfa: new RunnableNFA().init(presets[index].definition),
 		});
 	}
 
@@ -325,10 +321,9 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 	 * @param methodName The name of the NFA method to call.
 	 * @param args The args to pass to the NFA method call.
 	 */
-	onNFA = (methodName: string, ...args: any[]): void => {
+	onNFA(methodName: string, ...args: any[]): void {
 		this.setState((prevState, props) => {
 			if (!(prevState.nfa[methodName] instanceof Function)) {
-				console.log(methodName + " is not a valid NFA method!");
 				throw new Error(methodName + " is not a valid NFA method!");
 			}
 			try {
@@ -376,8 +371,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 		this.onNFA('run');
 	}
 
-	setImporting = (contents: string) => {
-		console.log("Updated importing");
+	setImporting(contents: string) {
 		this.setState({
 			importing: contents,
 		});
@@ -429,8 +423,7 @@ export default class NFAEditor extends React.PureComponent<{}, IState> {
 
 	updateTransitionTarget = (origin: State, oldTarget: State, newTarget: State) => {
 		if (this.state.nfa.hasTransition(origin, newTarget)) {
-			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions.\
-				Do you wish to continue?")) {
+			if (!window.confirm("There is already a transition to that state, so this will merge the two transitions. Do you wish to continue?")) {
 				return;
 			}
 		}

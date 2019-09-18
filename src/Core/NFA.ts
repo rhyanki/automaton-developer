@@ -1,4 +1,4 @@
-import {Map, Set, isImmutable} from 'immutable';
+import {Map, Set} from 'immutable';
 import SymbolGroup, {SymbolGroupInput} from './SymbolGroup';
 
 /**
@@ -49,12 +49,8 @@ export default class NFA {
 		reachableStates?: Set<State>,
 		willAccept?: boolean,
 	};
-	
-	constructor(definition: NFA | IDefinition, mutable?: boolean) {
-		this._init(definition, mutable);
-	}
 
-	protected _init(definition: NFA | IDefinition, mutable?: boolean): this {
+	public init(definition: NFA | IDefinition, mutable?: boolean): this {
 		// If this is a copy of an existing NFA ...
 		if (definition instanceof NFA) {
 			for (const k in definition) {
@@ -417,13 +413,10 @@ export default class NFA {
 		// Note that there is currently a bug in immutable.js which seems to sometimes make asImmutable() return a new object
 		// rather than the original, leaving the original mutable.
 
-		if (!isImmutable(this._transitions)) {
-			const allTransitions = this._transitions as TransitionMap;
-			for (const [origin, transitions] of allTransitions) {
-				allTransitions.set(origin, transitions.asImmutable());
-			}
-			this._transitions = allTransitions.asImmutable();
+		for (const [origin, transitions] of this._transitions) {
+			this._transitions.set(origin, transitions.asImmutable());
 		}
+		this._transitions = this._transitions.asImmutable();
 		this._accept = this._accept.asImmutable();
 		this._states = this._states.asImmutable();
 		this._names = this._names.asImmutable();
@@ -484,7 +477,7 @@ export default class NFA {
 	 * Return a shallow, mutable copy of the NFA.
 	 */
 	mutableCopy(copyCache: boolean = true): this {
-		const nfa = new (this.constructor as any)(this, true);
+		const nfa = new (this.constructor as any)().init(this, true);
 		if (copyCache) {
 			for (const key in this._cache) {
 				if (this._cache.hasOwnProperty(key)) {
@@ -694,7 +687,7 @@ export default class NFA {
 		}
 
 		// hasTransition() above guarantees that this is not undefined
-		const transitions = (nfa._transitions.get(origin))!.asMutable();
+		const transitions = nfa._transitions.get(origin)!.asMutable();
 
 		// Update the transition
 		nfa._transitions = nfa._transitions.asMutable().set(origin, transitions.set(target, symbols));

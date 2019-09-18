@@ -12,7 +12,7 @@ export {SymbolGroup};
 
 export default class RunnableNFA extends NFA {
 	// Set of current possible states while running (if DFA, this always contains at most one state).
-	protected _current: Set<State>;
+	public _current!: Set<State>;
 
 	// The remaining input to consume this run
 	protected _remainingInput: string;
@@ -26,12 +26,12 @@ export default class RunnableNFA extends NFA {
 	// The value is the step on which it was last followed.
 	protected _followedTransitions: Map<string, number>;
 
-	protected _init(definition: NFA | IDefinition, mutable?: boolean): this {
+	public init(definition: NFA | IDefinition, mutable?: boolean): this {
 		this._current = Set().asMutable();
 		this._remainingInput = "";
 		this._numRead = -1;
-		this._followedTransitions = Map().asMutable() as Map<string, number>;
-		return super._init(definition, mutable);
+		this._followedTransitions = Map<string, number>().asMutable();
+		return super.init(definition, mutable);
 	}
 
 	/**

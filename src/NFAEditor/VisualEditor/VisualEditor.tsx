@@ -218,7 +218,10 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 	/**
 	 * Convert DOM coordinates to SVG coordinates.
 	 */
-	getSVGPoint(x: number | Vector, y?: number) {
+	getSVGPoint(x: number | Vector, y?: number): Vector | null {
+		if (!this.svg) {
+			return null
+		}
 		if (x instanceof Vector) {
 			y = x.y;
 			x = x.x;
@@ -226,7 +229,11 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 		let point = this.svg.current!.createSVGPoint();
 		point.x = x;
 		point.y = y as number;
-		point = point.matrixTransform(this.svg.current!.getScreenCTM()!.inverse());
+		const screenCTM = this.svg.current!.getScreenCTM()
+		if (!screenCTM) {
+			return null
+		}
+		point = point.matrixTransform(screenCTM.inverse());
 		return new Vector(point.x, point.y);
 	}
 
@@ -251,6 +258,9 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 	 */
 	onMouseDownState(e: React.MouseEvent<any>, state: State) {
 		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
+		if (!cursorPos) {
+			return
+		}
 		// If left-click, this is a state drag; if right-click, it's a transition drag
 		if (e.button === 0) {
 			this.dragStateStart(state, cursorPos);
@@ -288,6 +298,9 @@ class VisualEditor extends React.PureComponent<IProps, IState> {
 	 */
 	onMouseMove(e: React.MouseEvent<any>) {
 		const cursorPos = this.getSVGPoint(e.clientX, e.clientY);
+		if (!cursorPos) {
+			return
+		}
 		this.dragStateContinue(cursorPos);
 		this.drawTransitionContinue(cursorPos);
 	}

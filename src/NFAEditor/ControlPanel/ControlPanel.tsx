@@ -16,10 +16,6 @@ interface IProps {
 };
 
 export default class ControlPanel extends React.PureComponent<IProps> {
-	constructor(props: IProps) {
-		super(props);
-	}
-
 	render() {
 		const nfa = this.props.nfa;
 		return (
